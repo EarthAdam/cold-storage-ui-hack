@@ -25,12 +25,13 @@ const STORE = "hold.geh.v1";
 const PROFILES = {
   clinic: {
     label: "Clinic",
-    blurb: "2–8 °C. Freeze ruins stock the same as heat. Uptime is the job.",
+    blurb: "{band}. Freeze ruins stock the same as heat. Uptime is the job.",
+    speakBand: [2, 8],
     currency: "USD",
     lines: {
       ok: "In band. Leave the lid shut.",
       freeze: "Too cold. Stop cooling. Freezing ruins these vaccines the same as heat. If it does not rise, call the person who repairs this cabinet.",
-      doorHot: "The lid is open and the cabinet is warm. Close it. Stay until the temperature is back between 2 and 8 °C.",
+      doorHot: "The lid is open and the cabinet is warm. Close it. Stay until the temperature is back inside {band}.",
       outHot: "Power is gone and the cabinet is leaving the band. Keep the lid shut. Do not move stock to a kerosene fridge. Call the person who holds the repair.",
       hot: "Above the band. Check the lid, the ventilation, and whether the compressor is actually drawing power.",
       cold: "Under the band, not yet freezing. Watch it. Do not add extra ice against the vials.",
@@ -40,7 +41,7 @@ const PROFILES = {
       wet: "Air is wetter than this room wants. A stuck lid or a warm gasket does this.",
       door: "Lid is open. Close it. Every minute open spends holdover.",
       silent: "This board stopped reporting. Check the node before you trust the last temperature.",
-      noprobe: "The board is on the topic, but temperature and humidity are still 0. The probe is not live yet."
+      noprobe: "The board is on the topic, but temperature and humidity are still {zero} and 0 %. The probe is not live yet."
     },
     rooms: [
       roomSpec({
@@ -83,7 +84,7 @@ const PROFILES = {
       wet: "Wetter than this room wants.",
       door: "Hatch is open. Close it between landings.",
       silent: "This board stopped reporting. Check it before you trust the hold.",
-      noprobe: "Board is publishing, probe still reads 0 °C and 0 %. Sensor is not live."
+      noprobe: "Board is publishing, probe still reads {zero} and 0 %. Sensor is not live."
     },
     rooms: [
       roomSpec({
@@ -228,7 +229,8 @@ const state = {
   client: null,
   inbox: {},
   inboxNoted: {},
-  route: null
+  route: null,
+  unit: "C"
 };
 
 function loadStore() {
@@ -251,7 +253,8 @@ function saveStore() {
     profileId: state.profileId,
     selected: state.selected,
     binds: binds,
-    broker: broker
+    broker: broker,
+    unit: state.unit
   }));
 }
 
@@ -374,9 +377,33 @@ function money(amount) {
   }
 }
 
+function toDisplay(c) {
+  if (c == null || Number.isNaN(c)) return null;
+  return state.unit === "F" ? (c * 9 / 5) + 32 : c;
+}
+
+function unitSuffix() {
+  return state.unit === "F" ? "°F" : "°C";
+}
+
 function deg(n) {
-  if (n == null || Number.isNaN(n)) return "—";
-  return n.toFixed(1) + "°";
+  const v = toDisplay(n);
+  if (v == null) return "—";
+  return v.toFixed(1) + unitSuffix();
+}
+
+function bandPhrase(min, max) {
+  const a = toDisplay(min);
+  const b = toDisplay(max);
+  if (a == null || b == null) return "—";
+  return a.toFixed(1) + "–" + b.toFixed(1) + unitSuffix();
+}
+
+function fill(text, room) {
+  const span = room ? [room.band.min, room.band.max] : profile().speakBand;
+  return String(text)
+    .replaceAll("{band}", span ? bandPhrase(span[0], span[1]) : "")
+    .replaceAll("{zero}", deg(0));
 }
 
 function mins(m) {
@@ -584,8 +611,8 @@ function ruler(room) {
       '<div class="zone" style="left:' + bandL.toFixed(1) + '%;width:' + Math.max(0, bandR - bandL).toFixed(1) + '%"></div>' +
       '<div class="mark" style="left:calc(' + mark.toFixed(1) + '% - 2px)"></div>' +
     '</div>' +
-    '<div class="caps"><span>' + esc(deg(room.scale.min)) + '</span><span>band ' +
-      esc(room.band.min) + '–' + esc(room.band.max) + '°</span><span>' + esc(deg(room.scale.max)) + '</span></div>'
+    '<div class="caps"><span>' + esc(deg(room.scale.min)) + '</span><span>' +
+      esc(bandPhrase(room.band.min, room.band.max)) + '</span><span>' + esc(deg(room.scale.max)) + '</span></div>'
   );
 }
 
@@ -645,7 +672,7 @@ function renderTimelines() {
   const last = samples[samples.length - 1] || {};
   const power = room.powerExpected;
   const specs = [
-    { key: "temp", label: "Temperature", min: room.scale.min, max: room.scale.max, band: [room.band.min, room.band.max], now: deg(room.temp), stroke: "#1f6f58" },
+    { key: "temp", label: "Temperature " + unitSuffix(), min: room.scale.min, max: room.scale.max, band: [room.band.min, room.band.max], now: deg(room.temp), stroke: "#1f6f58" },
     { key: "rh", label: "Humidity", min: 0, max: 100, band: room.rhBand ? [room.rhBand.min, room.rhBand.max] : null, now: room.rh == null ? "—" : Math.round(room.rh) + "%", stroke: "#3d6f8a" },
     { key: "door", label: "Door", min: 0, max: 1, step: true, now: room.door ? "Open" : "Shut", stroke: "#1c1915" },
     { key: "w", label: "Power", min: 0, max: Math.max(room.runW * 1.5, 80), power: true, now: power && room.watts != null ? Math.round(room.watts) + " W" : "No mains", stroke: "#8a5a12" },
@@ -731,7 +758,7 @@ function paintPlan() {
     const mist = g.querySelector(".mist");
     if (mist) mist.setAttribute("opacity", room.rh == null ? 0 : Math.max(0, Math.min(0.42, room.rh / 100 * 0.45)).toFixed(2));
     const readout = g.querySelector(".readout");
-    if (readout) readout.textContent = room.temp == null ? "—" : room.temp.toFixed(1) + "°";
+    if (readout) readout.textContent = deg(room.temp);
     const sub = g.querySelector(".subread");
     if (sub) {
       const rh = room.rh == null ? "—" : Math.round(room.rh) + "%";
@@ -761,6 +788,12 @@ function renderSwitch() {
     return '<button type="button" data-profile="' + id + '" aria-pressed="' + on + '">' +
       esc(PROFILES[id].label) + '</button>';
   }).join("");
+}
+
+function renderUnit() {
+  document.querySelectorAll("#unit [data-unit]").forEach(function (btn) {
+    btn.setAttribute("aria-pressed", btn.getAttribute("data-unit") === state.unit ? "true" : "false");
+  });
 }
 
 function feedName(room) {
@@ -803,7 +836,7 @@ function renderStrip() {
   bits.push(uptime);
   bits.push((wh / 1000).toFixed(2) + " kWh on this desk");
   document.getElementById("strip").textContent = bits.join("  ·  ");
-  document.getElementById("blurb").textContent = profile().blurb;
+  document.getElementById("blurb").textContent = fill(profile().blurb, null);
 }
 
 function renderRooms() {
@@ -819,7 +852,7 @@ function renderRooms() {
     return '<button type="button" class="room ' + sit.level + '" data-room="' + esc(room.id) + '" aria-current="' +
       (room.id === state.selected) + '"><span class="lvl ' + sit.level + '">' + esc(sit.level) + ' · ' + esc(src) +
       '</span><span class="name">' + esc(room.name) + '</span><span class="meta">' + esc(deg(room.temp)) +
-      ' · ' + esc(profile().lines[sit.key].split(".")[0]) + '</span></button>';
+      ' · ' + esc(fill(profile().lines[sit.key], room).split(".")[0]) + '</span></button>';
   }).join("");
 
   const box = document.getElementById("unassigned");
@@ -859,9 +892,9 @@ function renderDetail() {
     '<p class="kicker ' + sit.level + '">' + esc(sit.level) + " · " + esc(sit.key) + '</p>' +
     '<h2>' + esc(room.name) + '</h2>' +
     '<p class="place">' + esc(room.place) + coordText(room) + (room.deviceId ? " · " + esc(room.deviceId) : " · no board bound") + '</p>' +
-    '<p class="temp ' + sit.level + '">' + (room.temp == null ? "—" : room.temp.toFixed(1)) + '<span class="unit">°</span></p>' +
+    '<p class="temp ' + sit.level + '">' + (toDisplay(room.temp) == null ? "—" : toDisplay(room.temp).toFixed(1)) + '<span class="unit">' + esc(unitSuffix()) + '</span></p>' +
     ruler(room) +
-    '<p class="action">' + esc(profile().lines[sit.key]) + '</p>' +
+    '<p class="action">' + esc(fill(profile().lines[sit.key], room)) + '</p>' +
     '<ul class="facts">' +
       fact("Humidity", rhTxt) +
       fact("Door", doorTxt) +
@@ -906,6 +939,7 @@ function renderChip() {
 
 function render() {
   renderStrip();
+  renderUnit();
   paintPlan();
   renderRooms();
   renderDetail();
@@ -1158,12 +1192,21 @@ function boot() {
     if (store.broker.prefix) document.getElementById("broker-prefix").value = store.broker.prefix;
   }
   state.profileId = PROFILES[store.profileId] ? store.profileId : "clinic";
+  state.unit = store.unit === "F" ? "F" : "C";
   state.rooms = buildRooms(state.profileId);
   state.selected = state.rooms.some(function (r) { return r.id === store.selected; }) ? store.selected : state.rooms[0].id;
   renderSwitch();
   note("Simulated floor. A MeshEMS board replaces a room when you bind its id.");
   rememberLevel();
   render();
+
+  document.getElementById("unit").addEventListener("click", function (ev) {
+    const btn = ev.target.closest("[data-unit]");
+    if (!btn) return;
+    state.unit = btn.getAttribute("data-unit") === "F" ? "F" : "C";
+    saveStore();
+    render();
+  });
 
   document.getElementById("switch").addEventListener("click", function (ev) {
     const btn = ev.target.closest("[data-profile]");

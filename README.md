@@ -8,6 +8,8 @@ Global Energy Hackathon, 30 Oct â€“ 1 Nov 2026. Brief 01 is the clinic case (2â€
 
 Double-click `index.html` for the simulated floor.
 
+The desk shows Celsius or Fahrenheit. The header switch changes every temperature on the screen: the big number, the band, the plan, the room list, and the temperature timeline. Storage and MQTT stay in Celsius (`temperature_C`).
+
 Live MQTT from a browser needs a normal page origin. From this folder:
 
 ```bash
