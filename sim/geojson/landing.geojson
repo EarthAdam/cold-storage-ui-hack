@@ -1,0 +1,112 @@
+{
+  "type": "FeatureCollection",
+  "profile": "landing",
+  "illustrative": true,
+  "features": [
+    {
+      "type": "Feature",
+      "id": "landing:ice",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.8491,
+          -3.6362
+        ]
+      },
+      "properties": {
+        "profile": "landing",
+        "room": "ice",
+        "name": "Ice hold",
+        "place": "Landing",
+        "deviceId": "sim-landing-ice",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 0.4,
+        "humidity_percent": 88,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": -1,
+        "band_max_C": 2,
+        "WphA": 180,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 228,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "landing:day",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.8502,
+          -3.6354
+        ]
+      },
+      "properties": {
+        "profile": "landing",
+        "room": "day",
+        "name": "Day catch",
+        "place": "Landing",
+        "deviceId": "sim-landing-day",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 7.8,
+        "humidity_percent": 80,
+        "door_open": true,
+        "door_open_duration_ms": 2100000,
+        "power_expected": true,
+        "band_min_C": 0,
+        "band_max_C": 4,
+        "WphA": 240,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 226,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "landing:blast",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          39.8482,
+          -3.637
+        ]
+      },
+      "properties": {
+        "profile": "landing",
+        "room": "blast",
+        "name": "Blast",
+        "place": "Landing",
+        "deviceId": "sim-landing-blast",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": -18.4,
+        "humidity_percent": 70,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": -22,
+        "band_max_C": -15,
+        "WphA": 1320,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 229,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    }
+  ]
+}

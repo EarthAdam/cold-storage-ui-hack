@@ -1,0 +1,112 @@
+{
+  "type": "FeatureCollection",
+  "profile": "clinic",
+  "illustrative": true,
+  "features": [
+    {
+      "type": "Feature",
+      "id": "clinic:vaccine",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          34.7682,
+          0.5144
+        ]
+      },
+      "properties": {
+        "profile": "clinic",
+        "room": "vaccine",
+        "name": "Vaccine cabinet",
+        "place": "Rural post",
+        "deviceId": "sim-clinic-vaccine",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 4.6,
+        "humidity_percent": 48,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": 2,
+        "band_max_C": 8,
+        "WphA": 72,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 232,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "clinic:oxy",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          34.7688,
+          0.5148
+        ]
+      },
+      "properties": {
+        "profile": "clinic",
+        "room": "oxy",
+        "name": "Oxytocin cabinet",
+        "place": "Rural post",
+        "deviceId": "sim-clinic-oxy",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 11.4,
+        "humidity_percent": 74,
+        "door_open": true,
+        "door_open_duration_ms": 1320000,
+        "power_expected": true,
+        "band_min_C": 2,
+        "band_max_C": 8,
+        "WphA": 96,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 227,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "clinic:insulin",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          34.7676,
+          0.514
+        ]
+      },
+      "properties": {
+        "profile": "clinic",
+        "room": "insulin",
+        "name": "Insulin box",
+        "place": "Rural post",
+        "deviceId": "sim-clinic-insulin",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 1.1,
+        "humidity_percent": 45,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": 2,
+        "band_max_C": 8,
+        "WphA": 3,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 231,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    }
+  ]
+}

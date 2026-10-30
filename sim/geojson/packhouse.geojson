@@ -1,0 +1,112 @@
+{
+  "type": "FeatureCollection",
+  "profile": "packhouse",
+  "illustrative": true,
+  "features": [
+    {
+      "type": "Feature",
+      "id": "packhouse:leaf",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          36.4355,
+          -0.7354
+        ]
+      },
+      "properties": {
+        "profile": "packhouse",
+        "room": "leaf",
+        "name": "Leafy room",
+        "place": "Packhouse",
+        "deviceId": "sim-packhouse-leaf",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 1.1,
+        "humidity_percent": 61,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": 0,
+        "band_max_C": 2,
+        "WphA": 310,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 230,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "packhouse:tomato",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          36.4364,
+          -0.7346
+        ]
+      },
+      "properties": {
+        "profile": "packhouse",
+        "room": "tomato",
+        "name": "Tomato room",
+        "place": "Packhouse",
+        "deviceId": "sim-packhouse-tomato",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 11.6,
+        "humidity_percent": 86,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": 10,
+        "band_max_C": 13,
+        "WphA": 260,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 231,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    },
+    {
+      "type": "Feature",
+      "id": "packhouse:out",
+      "geometry": {
+        "type": "Point",
+        "coordinates": [
+          36.4346,
+          -0.7362
+        ]
+      },
+      "properties": {
+        "profile": "packhouse",
+        "room": "out",
+        "name": "Market cooler",
+        "place": "Packhouse",
+        "deviceId": "sim-packhouse-out",
+        "illustrative": true,
+        "time": "2026-10-30T21:26:34.276Z",
+        "temperature_C": 6.4,
+        "humidity_percent": 78,
+        "door_open": false,
+        "door_open_duration_ms": 0,
+        "power_expected": true,
+        "band_min_C": 4,
+        "band_max_C": 8,
+        "WphA": 0,
+        "WphB": 0,
+        "WphC": 0,
+        "PhVphA": 0,
+        "PhVphB": 0,
+        "PhVphC": 0,
+        "Hz": 50,
+        "TotWhImport": 0
+      }
+    }
+  ]
+}

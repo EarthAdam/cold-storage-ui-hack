@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold · cold storage desk</title>
+<link rel="stylesheet" href="hold.css">
+</head>
+<body>
+<header class="top">
+  <div class="brand">
+    <p class="mark">Hold</p>
+    <p class="blurb" id="blurb"></p>
+  </div>
+  <div class="switch" id="switch" role="group" aria-label="Trade"></div>
+  <div class="top-actions">
+    <p class="link-chip" id="link-chip">Simulated floor</p>
+    <button type="button" class="text-btn" id="link-open">Link a board</button>
+  </div>
+</header>
+
+<p class="strip" id="strip"></p>
+<p class="honest">Prices and loss clocks are operator estimates for the demo. They are not quotes, lab results, or a ministry figure.</p>
+
+<div class="stage">
+  <aside class="list" aria-label="Rooms">
+    <div id="unassigned"></div>
+    <div id="rooms"></div>
+    <ol class="feed" id="feed"></ol>
+  </aside>
+  <main class="detail" id="detail">
+    <div id="plan" class="plan-host"></div>
+    <div id="detail-body"></div>
+    <p class="tl-head" id="tl-head"></p>
+    <div id="timelines" class="timelines"></div>
+    <details id="tech">
+      <summary>Phases and last payload</summary>
+      <p class="phases" id="phases"></p>
+      <pre class="raw" id="raw"></pre>
+    </details>
+    <form class="bind" id="bind-form">
+      <label>MeshEMS board on this room
+        <input id="bind" name="bind" autocomplete="off" spellcheck="false" placeholder="StreetPoleEMS_…">
+      </label>
+      <button type="submit">Use this board</button>
+    </form>
+  </main>
+</div>
+
+<dialog class="link" id="link">
+  <form method="dialog" id="link-form">
+    <h2>MQTT link</h2>
+    <p class="hint">The Nairobi board publishes on port 1883 to <code>public.cloud.shiftr.io</code>, topics <code>openami/&lt;id&gt;/subpanel_ENV</code> and <code>subpanel_3Ph</code>. Simulated trades publish GeoJSON to <code>openami/geojson/&lt;trade&gt;</code>. The desk uses the same broker over WebSocket.</p>
+    <label>WebSocket URL
+      <input name="url" id="broker-url" value="wss://public.cloud.shiftr.io">
+    </label>
+    <label>User
+      <input name="user" id="broker-user" value="public">
+    </label>
+    <label>Password
+      <input name="pass" id="broker-pass" type="password" value="public">
+    </label>
+    <label>Topic prefix
+      <input name="prefix" id="broker-prefix" value="openami">
+    </label>
+    <p class="hint" id="link-status"></p>
+    <div class="row">
+      <button type="button" class="text-btn" id="link-close">Close</button>
+      <button type="submit" id="link-go">Connect</button>
+      <button type="button" class="text-btn" id="link-stop">Disconnect</button>
+    </div>
+  </form>
+</dialog>
+
+<footer>
+  <p>Glenn · Ademola · Bonheur · Sam · Ursy · Adam</p>
+  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · Brief 01, off-grid cold storage</p>
+</footer>
+<script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
+<script src="plan.js"></script>
+<script src="hold.js"></script>
+</body>
+</html>
