@@ -250,6 +250,7 @@ function buildHouse() {
     ms: 14000,
     path: [[0.2, 1.2], [0.2, -2.2], [2.4, -2.2], [2.4, -1.0], [0.6, 0.8]]
   });
+  makeBank(4.7, 3.85, 1.05);
 }
 
 function sign(name, x, y, z, sub, stock) {
@@ -301,6 +302,7 @@ var drum = null;
 var drops = [];
 var folk = [];
 var clinicDoor = null;
+var bank = null;
 var CLINIC_MARKS = [];
 var LOOK = {
   vaccine: 0xf7f4ef,
@@ -311,6 +313,70 @@ var LOOK = {
   out: 0x1f6f8a
 };
 
+function makeBank(x, z, scale) {
+  var g = new THREE.Group();
+  g.position.set(x, 0, z);
+  g.add(box(1.55 * scale, 0.14 * scale, 0.58 * scale, mat(0x1c2428, 0.4, 0.45), 0, 0.08 * scale, 0));
+  var fills = [];
+  var i;
+  for (i = 0; i < 4; i++) {
+    fills.push(box(0.26 * scale, 0.52 * scale, 0.3 * scale, new THREE.MeshStandardMaterial({
+      color: 0x7eb0c8,
+      roughness: 0.32,
+      metalness: 0.28,
+      emissive: 0x1a4060,
+      emissiveIntensity: 0.35
+    }), (-0.48 + i * 0.32) * scale, 0.42 * scale, 0));
+    g.add(fills[i]);
+  }
+  var arrow = new THREE.Mesh(
+    new THREE.ConeGeometry(0.11 * scale, 0.3 * scale, 10),
+    new THREE.MeshStandardMaterial({
+      color: 0xe6c56a,
+      roughness: 0.3,
+      metalness: 0.2,
+      emissive: 0xe6c56a,
+      emissiveIntensity: 0.4
+    })
+  );
+  arrow.position.set(0.86 * scale, 0.55 * scale, 0);
+  g.add(arrow);
+  var label = makeLabel();
+  label.sprite.position.set(0, 1.05 * scale, 0);
+  label.sprite.scale.set(1.35 * Math.max(1, scale * 0.7), 0.68 * Math.max(1, scale * 0.7), 1);
+  g.add(label.sprite);
+  scene.add(g);
+  bank = { fills: fills, arrow: arrow, label: label, scale: scale, cellH: 0.52 * scale, base: 0.16 * scale };
+}
+
+function paintBank(hour) {
+  if (!bank || !window.HoldBattery) return;
+  var b = window.HoldBattery(hour == null ? 6 : hour);
+  var charging = b.flow > 0;
+  var hex = charging ? 0xe6c56a : 0x3aa0d8;
+  var glow = charging ? 0x8a6a20 : 0x1a4060;
+  bank.fills.forEach(function (cell, i) {
+    var local = b.soc * bank.fills.length - i;
+    if (local < 0) local = 0;
+    if (local > 1) local = 1;
+    var grow = 0.08 + 0.92 * local;
+    cell.scale.y = grow;
+    cell.position.y = bank.base + (bank.cellH * grow) / 2;
+    cell.material.color.setHex(hex);
+    cell.material.emissive.setHex(glow);
+    cell.material.emissiveIntensity = 0.2 + 0.55 * local;
+  });
+  bank.arrow.rotation.x = charging ? 0 : Math.PI;
+  bank.arrow.material.color.setHex(hex);
+  bank.arrow.material.emissive.setHex(glow);
+  paintLabel(bank.label, {
+    name: "Battery",
+    temp: Math.round(b.soc * 100) + "%",
+    sub: charging ? "charging" : "discharging",
+    stock: "illustrative day"
+  });
+}
+
 function emptyScene() {
   tractor = null;
   tractor2 = null;
@@ -318,6 +384,7 @@ function emptyScene() {
   drops = [];
   folk = [];
   clinicDoor = null;
+  bank = null;
   cabs = [];
   wireMat = null;
   if (!scene) return;
@@ -506,6 +573,7 @@ function buildFarm() {
   shed.sprite.scale.set(3.4, 1.6, 1);
   paintLabel(shed, { name: "Packinghouse", temp: "", sub: "cold rooms", stock: "four fields" });
   scene.add(shed.sprite);
+  makeBank(11.4, 5.6, 2.6);
 
   [
     { id: "leaf", x: 0.4 },
@@ -654,6 +722,7 @@ function frame(now) {
     }
   });
   var hour = window.HoldDay && window.HoldDay.hour ? window.HoldDay.hour() : null;
+  paintBank(hour);
   var awake = hour == null || (hour >= 8 && hour < 17);
   folk.forEach(function (f) {
     var show = f.kind === "staff" || awake || reduce;

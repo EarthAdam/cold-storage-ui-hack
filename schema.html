@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · MQTT subtopics</title>
-<link rel="stylesheet" href="hold.css?v=29">
+<link rel="stylesheet" href="hold.css?v=30">
 <style>
   .spec { max-width: 78ch; margin: 0 auto; padding: 28px 22px 64px; }
   .spec h1 { font-family: var(--serif); font-weight: 560; font-size: 34px; margin: 0; }
@@ -29,9 +29,10 @@
 </head>
 <body>
 <article class="spec">
-  <p class="dim"><a href="index.html">Hold</a> · MQTT contract · <a href="https://github.com/EarthAdam/cold-storage-ui-hack">Source</a></p>
+  <p class="dim"><a href="index.html">Hold</a> · <a href="board.html">Board desk</a> · MQTT contract · <a href="https://github.com/EarthAdam/cold-storage-ui-hack">Source</a></p>
   <h1>Subtopic schema</h1>
   <p>MeshEMS publishes JSON. The desk only listens. Temperature on the wire is always Celsius. One board keeps the relay and the setpoint. Nothing in this page is a command.</p>
+  <p>The <a href="board.html">board desk</a> reads a local log of these same publishes. The log keeps running when the site is closed. Start it with <code>node log/record.mjs</code>.</p>
   <p>The same two payloads cover a clinic cabinet, a fish hold, and a packhouse room. A site with several cold systems repeats the environment payload, once per system. Bands, stock, and money stay on the desk. They are not sensor fields.</p>
 
   <h2>Topics</h2>

@@ -483,6 +483,16 @@
         html += '<circle class="now-dot" data-dot="power" r="2.5" fill="#e6c56a"/>';
       }
     }
+    if (window.HoldBattery) {
+      var bat = [];
+      var bi;
+      for (bi = 0; bi < 96; bi++) bat.push({ h: (bi / 96) * 24, soc: window.HoldBattery((bi / 96) * 24).soc });
+      var bd = poly(bat, function (p) { return p.soc; }, [0, 1]);
+      html += '<path class="hit" data-id="battery" d="' + bd + '"/>';
+      html += '<path class="trace battery pick" data-id="battery" data-trace="battery" d="' + bd +
+        '" stroke="#7eb0c8"><title>battery</title></path>';
+      html += '<circle class="now-dot" data-dot="battery" r="2.6" fill="#7eb0c8"/>';
+    }
     g.innerHTML = html;
   }
 
@@ -508,10 +518,15 @@
     if (s.w != null) rest += " · " + Math.round(s.w) + " W";
     if (s.v != null && s.v < 40) rest += " · no volts";
     if (s.door) rest += " · open";
+    if (window.HoldBattery) {
+      var pack = window.HoldBattery(h);
+      rest += " · " + Math.round(pack.soc * 100) + "% " + (pack.flow > 0 ? "charging" : "discharging");
+    }
     if (readRest) readRest.textContent = rest;
     placeDot("temp", s.h, rAt(s.temp, sel._temp));
     placeDot("rh", s.h, rAt(s.rh, sel._rh));
     if (s.w != null) placeDot("power", s.h, rAt(s.w, sel._w));
+    if (window.HoldBattery) placeDot("battery", h, rAt(window.HoldBattery(h).soc, [0, 1]));
   }
 
   function moveHand() {

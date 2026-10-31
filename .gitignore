@@ -1,0 +1,4 @@
+log/streams.json
+log/*.sqlite
+log/*.sqlite-shm
+log/*.sqlite-wal

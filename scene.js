@@ -43,6 +43,7 @@
   var focusLL = null;
   var orbit = false;
   var chainMarkers = [];
+  var batMarker = null;
   var craftList = [];
   var craftMarkers = {};
   var motion = 0;
@@ -586,6 +587,13 @@
       if (!c.hist) c.hist = [];
       pushHist(c.hist, here);
     });
+    if (batMarker && h != null && window.HoldBattery) {
+      var pack = window.HoldBattery(h);
+      var charging = pack.flow > 0;
+      batMarker._el.classList.toggle("charge", charging);
+      batMarker._fill.style.width = Math.round(pack.soc * 100) + "%";
+      batMarker._word.textContent = Math.round(pack.soc * 100) + "% " + (charging ? "charging" : "discharging");
+    }
     if (h != null && routeLine && markers.route) {
       var su = roadAlong(h);
       var shipHere = pointAt(routeLine, su);
@@ -676,6 +684,7 @@
     if (pop) { pop.remove(); pop = null; }
     chainMarkers.forEach(function (m) { m.remove(); });
     chainMarkers = [];
+    batMarker = null;
     var areas = {
       type: "FeatureCollection",
       features: (chain.areas || []).map(function (a) {
@@ -714,6 +723,18 @@
       chainMarkers.push(new maplibregl.Marker({ element: el, anchor: "left" }).setLngLat(c).addTo(map));
     });
     armCraft(chain.craft || []);
+    if (id === "landing") {
+      var el = document.createElement("div");
+      el.className = "bat-pin";
+      el.innerHTML = "<b>Battery</b><i><s></s></i><em></em>";
+      batMarker = new maplibregl.Marker({ element: el, anchor: "left" })
+        .setLngLat([39.8464, -3.63395])
+        .addTo(map);
+      batMarker._el = el;
+      batMarker._fill = el.querySelector("s");
+      batMarker._word = el.querySelector("em");
+      chainMarkers.push(batMarker);
+    }
   }
 
   function apply(opts) {

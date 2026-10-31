@@ -398,6 +398,29 @@ function sun01(h) {
   return x > 0 ? x : 0;
 }
 
+/* Illustrative pack. Not a measured battery.
+   Charges while a typical array beats the compressor, then
+   gives that charge back overnight so the day closes. */
+function batteryAt(h) {
+  const x = ((h % 24) + 24) % 24;
+  const from = 7.15;
+  const to = 16.35;
+  const lo = 0.34;
+  const hi = 0.93;
+  function smooth(t) {
+    if (t < 0) t = 0;
+    if (t > 1) t = 1;
+    return t * t * (3 - 2 * t);
+  }
+  if (x + 1e-4 >= from && x <= to + 1e-4) {
+    return { soc: lo + (hi - lo) * smooth((x - from) / (to - from)), flow: 1 };
+  }
+  const span = from + 24 - to;
+  const at = x >= to ? x - to : x + 24 - to;
+  return { soc: hi + (lo - hi) * smooth(at / span), flow: -1 };
+}
+window.HoldBattery = batteryAt;
+
 function onSpan(h, from, to) {
   const len = (to - from + 24) % 24;
   const at = (h - from + 24) % 24;
