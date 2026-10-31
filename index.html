@@ -4,7 +4,16 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · cold storage desk</title>
-<link rel="stylesheet" href="hold.css">
+<link rel="stylesheet" href="hold.css?v=27">
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
+  }
+}
+</script>
+<link rel="stylesheet" href="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css">
 </head>
 <body>
 <header class="top">
@@ -12,7 +21,10 @@
     <p class="mark">Hold</p>
     <p class="blurb" id="blurb"></p>
   </div>
-  <div class="switch" id="switch" role="group" aria-label="Trade"></div>
+  <nav class="menu" aria-label="Desk">
+    <div class="switch" id="switch" role="group" aria-label="Trade"></div>
+    <a class="text-btn" href="schema.html">MQTT schema</a>
+  </nav>
   <div class="top-actions">
     <div class="switch" id="unit" role="group" aria-label="Temperature unit">
       <button type="button" data-unit="C" aria-pressed="true">°C</button>
@@ -33,7 +45,27 @@
     <ol class="feed" id="feed"></ol>
   </aside>
   <main class="detail" id="detail">
+    <div class="fit" id="fit">
     <div id="plan" class="plan-host"></div>
+    <div class="scene-wrap" style="position:relative;background:#0c0e12">
+      <div id="scene" aria-label="OpenStreetMap place"></div>
+      <button type="button" class="text-btn scene-follow" id="scene-follow" hidden>Stop following</button>
+      <button type="button" class="text-btn scene-wide" id="scene-wide">Wider map</button>
+      <p class="scene-meta" id="scene-meta"></p>
+    </div>
+    <section class="day-wrap" id="day" aria-label="Daily cycle">
+      <div class="day-face" id="day-face"></div>
+      <a class="circa-mark" href="https://circaevum.com/" target="_blank" rel="noopener noreferrer" title="Powered by Circaevum graphics library">
+        <svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true">
+          <circle cx="8" cy="8" r="2.1" fill="currentColor"/>
+          <ellipse cx="8" cy="8" rx="6.3" ry="2.35" fill="none" stroke="currentColor" stroke-width="1.15"/>
+          <ellipse cx="8" cy="8" rx="6.3" ry="2.35" fill="none" stroke="currentColor" stroke-width="1.15" transform="rotate(60 8 8)"/>
+          <ellipse cx="8" cy="8" rx="6.3" ry="2.35" fill="none" stroke="currentColor" stroke-width="1.15" transform="rotate(120 8 8)"/>
+        </svg>
+        <span class="circa-mark-txt"><b>Circaevum</b><span>graphics library</span></span>
+      </a>
+    </section>
+    </div>
     <div id="detail-body"></div>
     <p class="tl-head" id="tl-head"></p>
     <div id="timelines" class="timelines"></div>
@@ -78,10 +110,15 @@
 
 <footer>
   <p>Glenn · Ademola · Bonheur · Sam · Ursy · Adam</p>
-  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · Brief 01, off-grid cold storage</p>
+  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · Brief 01, off-grid cold storage · <a href="schema.html">MQTT schema</a></p>
 </footer>
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
-<script src="plan.js"></script>
-<script src="hold.js"></script>
+<script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
+<script src="chain.js?v=11"></script>
+<script src="day.js?v=14"></script>
+<script src="scene.js?v=16"></script>
+<script src="plan.js?v=12"></script>
+<script src="hold.js?v=20"></script>
+<script type="module" src="doll.js?v=7"></script>
 </body>
 </html>

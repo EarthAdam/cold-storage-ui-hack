@@ -1,7 +1,5 @@
 /* Hypothetical technical plans. Schematic, not a survey. */
 (function () {
-  var SHIP = [[300, 188], [430, 150], [560, 176], [690, 248]];
-
   function zone(id, x, y, w, h, name) {
     var doorW = Math.max(28, Math.min(52, w * 0.28));
     return (
@@ -30,16 +28,16 @@
     );
   }
 
-  function legend() {
+  function legend(y) {
     return (
-      '<g class="legend" transform="translate(28,458)">' +
-        '<rect width="12" height="12" fill="#cfe3d6"/>' +
+      '<g class="legend" transform="translate(28,' + (y || 458) + ')">' +
+        '<rect width="12" height="12" fill="#1e3a30"/>' +
         '<text x="16" y="10">in band</text>' +
-        '<rect x="78" width="12" height="12" fill="#f3ddb0"/>' +
+        '<rect x="78" width="12" height="12" fill="#3f341c"/>' +
         '<text x="94" y="10">watch</text>' +
-        '<rect x="150" width="12" height="12" fill="#f0b2a4"/>' +
+        '<rect x="150" width="12" height="12" fill="#4a2a24"/>' +
         '<text x="166" y="10">act</text>' +
-        '<rect x="210" width="12" height="12" fill="#c5d4e8"/>' +
+        '<rect x="210" width="12" height="12" fill="#2a3a4e"/>' +
         '<text x="226" y="10">freeze</text>' +
         '<text x="300" y="10">door swings · fan spins while the compressor draws · tint is humidity</text>' +
       '</g>'
@@ -61,24 +59,80 @@
     );
   }
 
+  function cabinet(id, x, base, w, h, name, stock) {
+    var head = 86;
+    var doorTop = -h + head;
+    var doorH = h - head - 10;
+    var doorW = w - 16;
+    var rail = 236 - base;
+    return (
+      '<g class="zone" data-room="' + id + '" transform="translate(' + x + ',' + base + ')">' +
+        '<polygon class="cab-side" points="' + w + ',0 ' + (w + 26) + ',-14 ' + (w + 26) + ',' + (-h - 14) + ' ' + w + ',' + (-h) + '"/>' +
+        '<polygon class="cab-top" points="0,' + (-h) + ' ' + w + ',' + (-h) + ' ' + (w + 26) + ',' + (-h - 14) + ' 26,' + (-h - 14) + '"/>' +
+        '<rect class="zone-fill" y="' + (-h) + '" width="' + w + '" height="' + h + '"/>' +
+        '<rect class="frost" x="8" y="' + doorTop + '" width="' + doorW + '" height="' + doorH + '"/>' +
+        '<rect class="mist" x="8" y="' + doorTop + '" width="' + doorW + '" height="' + doorH + '"/>' +
+        '<g class="shelf"><path d="M12 ' + (doorTop + doorH * 0.38).toFixed(1) + ' H' + (w - 12) +
+          ' M12 ' + (doorTop + doorH * 0.7).toFixed(1) + ' H' + (w - 12) + '"/></g>' +
+        '<g class="parch" transform="translate(14,' + (doorTop + 10) + ')">' +
+          '<path d="M0 0 H' + (w - 40) + ' M0 12 H' + (w - 48) + '"/>' +
+        '</g>' +
+        '<rect class="zone-wall" y="' + (-h) + '" width="' + w + '" height="' + h + '"/>' +
+        '<g class="hinge" transform="translate(8,' + doorTop + ')">' +
+          '<g class="door">' +
+            '<rect width="' + doorW + '" height="' + doorH + '"/>' +
+            '<rect class="handle" x="' + (doorW - 16) + '" y="' + Math.round(doorH / 2 - 9) + '" width="3" height="18"/>' +
+          '</g>' +
+        '</g>' +
+        '<g class="fan-mount" transform="translate(' + (w - 22) + ',' + (-h + 22) + ')">' +
+          '<g class="fan">' +
+            '<circle r="8"/>' +
+            '<path d="M0,-5.5 V5.5 M-5.5,0 H5.5 M-4,-4 L4,4 M-4,4 L4,-4"/>' +
+          '</g>' +
+        '</g>' +
+        '<path class="feeder" d="M' + (w / 2) + ',' + (-h) + ' V' + rail + '"/>' +
+        '<text class="zone-name" x="12" y="' + (-h + 22) + '">' + name + '</text>' +
+        '<text class="readout" x="12" y="' + (-h + 48) + '">—</text>' +
+        '<text class="subread" x="12" y="' + (-h + 66) + '"></text>' +
+        '<text class="dim" x="0" y="18">' + stock + '</text>' +
+      '</g>'
+    );
+  }
+
   function clinic() {
-    return shell(
-      "Rural post",
-      "Solar, one MeshEMS node, three cabinets. Freeze is as bad as heat.",
-      '<g class="pv" transform="translate(48,88)">' +
-        '<rect width="250" height="34"/>' +
-        '<path d="M42 0 V34 M84 0 V34 M126 0 V34 M168 0 V34 M210 0 V34"/>' +
-        '<text x="8" y="22">PV</text>' +
-      '</g>' +
-      '<g class="node" transform="translate(330,90)">' +
-        '<rect width="78" height="30"/>' +
-        '<text x="8" y="20">MeshEMS</text>' +
-      '</g>' +
-      '<path class="bus" d="M173 122 H369 V148 H120 V168 M369 148 H400 V168 M400 148 H560 V168"/>' +
-      zone("vaccine", 48, 168, 230, 210, "Vaccine cabinet") +
-      zone("oxy", 300, 168, 190, 210, "Oxytocin") +
-      zone("insulin", 512, 168, 180, 150, "Insulin box") +
-      '<text class="dim" x="48" y="400">corridor · lids face the walk</text>'
+    return (
+      '<svg class="plan doll" viewBox="0 0 920 640" role="img" aria-label="Rural post cutaway">' +
+        '<rect class="sheet" width="920" height="640"/>' +
+        '<text class="sheet-kicker" x="28" y="32">CLINIC CUTAWAY</text>' +
+        '<text class="sheet-title" x="28" y="58">Rural post</text>' +
+        '<text class="sheet-sub" x="28" y="78">Front wall off. Three cabinets in one room. Click a lid.</text>' +
+        '<text class="sheet-note" x="760" y="36">schematic</text>' +
+        '<text class="sheet-note" x="760" y="52">not a survey</text>' +
+        '<g class="house">' +
+          '<polygon class="floor" points="150,508 830,508 890,562 210,562"/>' +
+          '<polygon class="wall" points="150,188 210,146 210,562 150,508"/>' +
+          '<polygon class="wall-back" points="150,188 830,188 830,508 150,508"/>' +
+          '<polygon class="wall" points="830,188 890,146 890,250 830,292"/>' +
+          '<polygon class="roof" points="128,196 852,196 920,132 196,132"/>' +
+          '<rect class="window" x="158" y="250" width="28" height="46"/>' +
+        '</g>' +
+        '<g class="pv" transform="translate(250,138)">' +
+          '<polygon points="0,36 460,36 500,8 40,8"/>' +
+          '<path d="M70 36 L98 8 M150 36 L178 8 M230 36 L258 8 M310 36 L338 8 M390 36 L418 8"/>' +
+          '<text x="8" y="28">PV</text>' +
+        '</g>' +
+        '<g class="node" transform="translate(390,204)">' +
+          '<rect width="78" height="24"/>' +
+          '<text x="8" y="16">MeshEMS</text>' +
+        '</g>' +
+        '<path class="bus" d="M429 168 V236 H305 M429 236 H520 M429 236 H715"/>' +
+        '<text class="dim" x="158" y="420">consult</text>' +
+        cabinet("vaccine", 210, 500, 190, 240, "Vaccine cabinet", "measles doses") +
+        cabinet("oxy", 440, 500, 160, 210, "Oxytocin", "vials") +
+        cabinet("insulin", 650, 500, 130, 170, "Insulin box", "vials") +
+        '<text class="dim" x="230" y="584">one room · lids face you · tint is the cabinet</text>' +
+        legend(612) +
+      '</svg>'
     );
   }
 
@@ -128,33 +182,9 @@
     );
   }
 
-  function dispatch() {
-    var pts = SHIP.map(function (p) { return p[0] + "," + p[1]; }).join(" ");
-    return shell(
-      "Dispatch hub",
-      "Two bays in the building. Route 4 is the passive box on the road.",
-      '<rect class="shed" x="36" y="96" width="250" height="300"/>' +
-      zone("hub", 48, 112, 220, 130, "Hub vaccines") +
-      zone("blood", 48, 258, 220, 120, "Blood bay") +
-      '<text class="dim" x="320" y="120">route 4</text>' +
-      '<polyline class="road" points="' + pts + '"/>' +
-      '<g class="drop" transform="translate(690,248)">' +
-        '<circle r="7"/>' +
-        '<text x="12" y="4">drop</text>' +
-      '</g>' +
-      '<g id="shipper" class="zone" data-room="route" transform="translate(360,170)">' +
-        '<rect class="zone-fill ship-body" x="-28" y="-16" width="56" height="32"/>' +
-        '<rect class="zone-wall ship-body" x="-28" y="-16" width="56" height="32"/>' +
-        '<text class="zone-name" x="0" y="-2" text-anchor="middle">shipper</text>' +
-        '<text class="readout" x="0" y="14" text-anchor="middle">—</text>' +
-      '</g>'
-    );
-  }
-
-  var PLANS = { clinic: clinic, landing: landing, packhouse: packhouse, dispatch: dispatch };
+  var PLANS = { clinic: clinic, landing: landing, packhouse: packhouse };
 
   window.HoldPlan = {
-    shipPath: SHIP,
     markup: function (id) {
       var fn = PLANS[id] || clinic;
       return fn();

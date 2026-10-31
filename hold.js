@@ -12,12 +12,8 @@
 
 const PLACES = {
   vaccine: [34.7682, 0.5144], oxy: [34.7688, 0.5148], insulin: [34.7676, 0.5140],
-  ice: [39.8491, -3.6362], day: [39.8502, -3.6354], blast: [39.8482, -3.6370],
-  leaf: [36.4355, -0.7354], tomato: [36.4364, -0.7346], out: [36.4346, -0.7362],
-  hub: [36.8524, -1.3192], blood: [36.8532, -1.3186], route: [36.9400, -1.3600]
-};
-const ROUTES = {
-  dispatch: [[36.8524, -1.3192], [36.9800, -1.3800], [37.1200, -1.4500], [37.2630, -1.5170]]
+  ice: [39.84915, -3.63400], day: [39.84975, -3.63405], blast: [39.84855, -3.63408],
+  leaf: [36.4355, -0.7354], tomato: [36.4364, -0.7346], out: [36.4346, -0.7362]
 };
 
 const STORE = "hold.geh.v1";
@@ -153,52 +149,6 @@ const PROFILES = {
         rh: 78, temp: 6.4, watts: 0, runW: 350, volts: 0,
         script: "outage", autonomyMin: 240, autonomyLeft: 26, spoilMin: 90,
         aside: "This load is the morning run."
-      })
-    ]
-  },
-  dispatch: {
-    label: "Dispatch",
-    blurb: "Hub, blood, and the passive box on the route. A warm shipper misses the drop.",
-    currency: "USD",
-    lines: {
-      ok: "In band. The drop can leave.",
-      freeze: "Too cold. This product does not survive a freeze. Pull it off the route.",
-      doorHot: "Door is open and the bay is warm. Close it. Hold the drops that depend on this bay.",
-      outHot: "Power is gone and the bay is warm. Do not release drops from this bay.",
-      hot: "Above the band. Hold the route until this box is cold again.",
-      cold: "Under the band. Check the pack-out before it freezes.",
-      outageSoon: "Power is out and holdover is short. Pause departures from this bay.",
-      outage: "Power is out. Product is still inside holdover. Do not open the bay.",
-      dry: "Drier than this bay wants.",
-      wet: "Wetter than this bay wants.",
-      door: "Door is open. Close it between pack-outs.",
-      silent: "This board stopped reporting. Do not release a drop on a silent sensor.",
-      noprobe: "No live probe yet. This route does not leave on a zero reading."
-    },
-    rooms: [
-      roomSpec({
-        id: "hub", name: "Hub vaccines", place: "Dispatch hub",
-        stock: "vaccine doses", qty: 2400, unit: "doses", unitValue: 1.5,
-        band: [2, 8], freeze: 2, freezeRuins: true, scale: [-2, 16],
-        rh: 52, temp: 5.1, watts: 110, runW: 120, volts: 230,
-        script: "hold", autonomyMin: 72 * 60, spoilMin: 40,
-        aside: "Flights pull from this bay."
-      }),
-      roomSpec({
-        id: "blood", name: "Blood bay", place: "Dispatch hub",
-        stock: "blood units", qty: 30, unit: "units", unitValue: 80,
-        band: [2, 6], freeze: 1, freezeRuins: true, scale: [0, 14],
-        rh: 70, temp: 8.6, watts: 140, runW: 130, volts: 227,
-        script: "door", excursionMin: 16, spoilMin: 25, autonomyMin: 180,
-        aside: "4 drops are waiting on this bay."
-      }),
-      roomSpec({
-        id: "route", name: "Route shipper", place: "Route 4 · passive",
-        stock: "packed doses", qty: 400, unit: "doses", unitValue: 2,
-        band: [2, 8], freeze: 2, freezeRuins: true, scale: [-2, 20],
-        rh: 58, temp: 13.2, watts: 0, volts: null,
-        script: "warm", powerExpected: false, excursionMin: 20, spoilMin: 45,
-        aside: "Passive box. No mains on this leg."
       })
     ]
   }
@@ -426,130 +376,225 @@ function note(text) {
   if (state.feed.length > 6) state.feed.length = 6;
 }
 
-function pointOnLine(line, t) {
-  const lens = [];
-  let total = 0;
-  let i;
-  for (i = 1; i < line.length; i++) {
-    const len = Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
-    lens.push(len);
-    total += len;
-  }
-  let dist = (t % 1) * total;
-  for (i = 0; i < lens.length; i++) {
-    if (dist <= lens[i] || i === lens.length - 1) {
-      const u = lens[i] ? Math.min(1, dist / lens[i]) : 0;
-      return [
-        line[i][0] + (line[i + 1][0] - line[i][0]) * u,
-        line[i][1] + (line[i + 1][1] - line[i][1]) * u
-      ];
-    }
-    dist -= lens[i];
-  }
-  return line[line.length - 1];
-}
-
-function fractionAlong(line, lng, lat) {
-  const lens = [];
-  let total = 0;
-  let i;
-  for (i = 1; i < line.length; i++) {
-    const len = Math.hypot(line[i][0] - line[i - 1][0], line[i][1] - line[i - 1][1]);
-    lens.push(len);
-    total += len;
-  }
-  if (!total) return 0;
-  let best = 0;
-  let bestD = Infinity;
-  let acc = 0;
-  for (i = 0; i < lens.length; i++) {
-    const ax = line[i][0];
-    const ay = line[i][1];
-    const bx = line[i + 1][0];
-    const by = line[i + 1][1];
-    const vx = bx - ax;
-    const vy = by - ay;
-    const l2 = vx * vx + vy * vy || 1;
-    let u = ((lng - ax) * vx + (lat - ay) * vy) / l2;
-    u = Math.max(0, Math.min(1, u));
-    const d = Math.hypot(lng - (ax + u * vx), lat - (ay + u * vy));
-    if (d < bestD) {
-      bestD = d;
-      best = (acc + u * lens[i]) / total;
-    }
-    acc += lens[i];
-  }
-  return best;
-}
-
 function setSimPower(room, volts, watts) {
   if (room.powerLive) return;
   room.volts = volts;
   room.watts = watts;
   room.phases = [watts || 0, 0, 0];
   room.powerKnown = room.powerExpected && volts != null;
+  if (room.powerExpected) room.hz = volts != null && volts > 40 ? 50 : 0;
 }
 
-function tickRoom(room) {
-  if (!room.envLive) {
-    const n = (Math.random() - 0.5) * 0.06;
-    const mid = (room.band.min + room.band.max) / 2;
-    if (room.script === "hold") {
+var CLINIC_DOORS = {
+  front: [8.05, 8.70, 9.40, 10.15, 11.00, 11.80, 12.55, 13.40, 14.20, 15.00, 15.75, 16.45],
+  vaccine: [8.35, 9.90, 11.40, 13.90, 15.40, 16.85],
+  oxy: [9.10, 10.55, 12.20, 14.60, 16.10]
+};
+window.CLINIC_DOORS = CLINIC_DOORS;
+var simPrev = 6;
+
+function sun01(h) {
+  const x = Math.sin(((h - 6) / 12) * Math.PI);
+  return x > 0 ? x : 0;
+}
+
+function onSpan(h, from, to) {
+  const len = (to - from + 24) % 24;
+  const at = (h - from + 24) % 24;
+  return at <= len + 1e-6;
+}
+
+function spanFrac(h, from, to) {
+  const len = (to - from + 24) % 24;
+  if (!len) return null;
+  const at = (h - from + 24) % 24;
+  if (at > len) return null;
+  return at / len;
+}
+
+function markIn(prev, h, marks) {
+  return marks.some(function (at) {
+    if (h >= prev) return at > prev && at <= h;
+    return at > prev || at <= h;
+  });
+}
+
+function ease(current, goal, simMin, tau) {
+  if (goal == null || Number.isNaN(goal)) return current;
+  if (current == null || Number.isNaN(current)) return goal;
+  const k = 1 - Math.exp(-Math.max(0, simMin) / tau);
+  return current + (goal - current) * k;
+}
+
+function lidOpen(h, marks) {
+  return marks.some(function (at) {
+    return ((h - at + 24) % 24) <= 0.18;
+  });
+}
+
+function applyDay(room, prev, h, simMin) {
+  const step = simMin == null ? 1 : simMin;
+  const sun = sun01(h);
+  const night = sun < 0.08;
+  const id = state.profileId;
+  const rise = 22;
+  const fall = 48;
+  if (id === "clinic") {
+    const marks = room.id === "vaccine" ? CLINIC_DOORS.vaccine : room.id === "oxy" ? CLINIC_DOORS.oxy : null;
+    const open = marks ? lidOpen(h, marks) : false;
+    if (room.id === "insulin") {
       room.door = false;
-      setSimPower(room, room.scale.min < -10 ? 229 : 231, room.temp > mid + 0.25 ? room.runW : Math.round(room.runW * 0.08));
-      room.temp += (room.temp > mid + 0.25 ? -0.04 : 0.02) + n;
-      room.rh += (Math.random() - 0.5) * 0.25;
-    } else if (room.script === "door") {
-      room.door = true;
-      setSimPower(room, 226, room.runW);
-      room.temp += (room.band.max + 3.5 - room.temp) * 0.04 + n;
-      room.rh = Math.min(94, room.rh + 0.08);
-    } else if (room.script === "freeze") {
-      room.door = false;
-      setSimPower(room, 231, 3);
-      room.temp += ((room.freeze != null ? room.freeze - 0.9 : room.temp) - room.temp) * 0.15 + n * 0.3;
-    } else if (room.script === "dry") {
-      room.door = false;
-      setSimPower(room, 230, Math.round(room.runW * 0.55));
-      room.temp += (mid - room.temp) * 0.08 + n;
-      room.rh += (61 - room.rh) * 0.08;
-    } else if (room.script === "outage") {
-      room.door = false;
-      setSimPower(room, 0, 0);
-      room.temp += 0.012 + Math.abs(n) * 0.05;
-    } else if (room.script === "warm") {
-      room.door = false;
-      setSimPower(room, null, 0);
-      room.temp += (room.band.max + 5 - room.temp) * 0.03;
-      const line = ROUTES[state.profileId];
-      if (line) {
-        room.along = (room.along + 0.005) % 1;
-        const at = pointOnLine(line, room.along);
-        room.lng = at[0];
-        room.lat = at[1];
-      }
+      room.temp = 1.05 + sun * 0.35;
+      room.rh = 46;
+      setSimPower(room, night ? 208 : 230, night ? 22 : 8);
+    } else {
+      const mid = (room.band.min + room.band.max) / 2;
+      const shut = mid - 0.2 + sun * 0.8;
+      const hot = room.id === "oxy" ? 11.2 : 7.4;
+      room.door = open;
+      room.temp = ease(room.temp, open ? hot : shut, step, open ? rise : fall);
+      room.rh = ease(room.rh, open ? 76 : 50, step, open ? rise : fall);
+      setSimPower(room, night ? 208 : 230, open || sun > 0.45 ? room.runW : Math.round(room.runW * 0.12));
     }
-    if (room.rh != null) room.rh = Math.max(5, Math.min(99, room.rh));
+    room.autonomyLeft = room.autonomyMin;
+    return;
   }
-  age(room);
+  if (id === "landing") {
+    const off = onSpan(h, 5.5, 7.2) || onSpan(h, 10.2, 11.6);
+    if (room.id === "ice") {
+      room.door = off;
+      room.temp = ease(room.temp, off ? 1.6 : 0.3, step, off ? rise : fall);
+      room.rh = 88;
+      setSimPower(room, night ? 210 : 229, off || sun > 0.3 ? room.runW : Math.round(room.runW * 0.2));
+    } else if (room.id === "day") {
+      room.door = off;
+      room.temp = ease(room.temp, off ? 7.6 : 1.4, step, off ? rise : fall);
+      room.rh = ease(room.rh, off ? 86 : 78, step, off ? rise : fall);
+      setSimPower(room, night ? 210 : 228, off ? room.runW : Math.round(room.runW * 0.25));
+    } else {
+      room.door = false;
+      room.temp = -18.6 + sun * 0.5;
+      room.rh = 70;
+      setSimPower(room, night ? 212 : 229, night ? Math.round(room.runW * 0.45) : room.runW);
+    }
+    room.autonomyLeft = room.autonomyMin;
+    return;
+  }
+  if (id === "packhouse") {
+    if (room.id === "leaf") {
+      const open = onSpan(h, 7, 9);
+      const base = 0.6 + sun * 1.5;
+      room.door = open;
+      room.temp = ease(room.temp, open ? base + 4.2 : base, step, open ? rise : fall);
+      const wet = onSpan(h, 10, 16) ? 58 : (onSpan(h, 6, 10) ? 74 : 82);
+      room.rh = ease(room.rh, wet, step, 40);
+      setSimPower(room, night ? 210 : 230, sun > 0.25 ? room.runW : Math.round(room.runW * 0.3));
+      room.autonomyLeft = room.autonomyMin;
+    } else if (room.id === "tomato") {
+      room.door = false;
+      room.temp = 11.1 + sun * 1.5;
+      room.rh = 90 - sun * 8;
+      setSimPower(room, night ? 210 : 231, sun > 0.25 ? room.runW : Math.round(room.runW * 0.22));
+      room.autonomyLeft = room.autonomyMin;
+    } else {
+      const lost = onSpan(h, 12, 16);
+      const truck = onSpan(h, 14, 18.5);
+      const f = spanFrac(h, 12, 16);
+      room.door = truck;
+      var goal;
+      if (lost) {
+        setSimPower(room, 0, 0);
+        room.autonomyLeft = Math.max(0, room.autonomyMin * (1 - f));
+        goal = 6.2 + f * 6;
+      } else {
+        setSimPower(room, 230, truck ? room.runW : Math.round(room.runW * 0.3));
+        room.autonomyLeft = room.autonomyMin;
+        goal = truck ? 8.4 : 6.1;
+      }
+      room.temp = ease(room.temp, goal, step, truck || lost ? rise : fall);
+      room.rh = 78;
+    }
+  }
+}
+
+var curvePack = null;
+var curveKey = "";
+
+function dayCurve(room) {
+  var ghost = {
+    id: room.id,
+    band: room.band,
+    runW: room.runW,
+    autonomyMin: room.autonomyMin,
+    powerExpected: room.powerExpected,
+    temp: null,
+    rh: null
+  };
+  var i;
+  var h;
+  var prev;
+  for (i = 0; i < 96; i++) {
+    h = (i / 96) * 24;
+    prev = (h - 0.25 + 24) % 24;
+    applyDay(ghost, prev, h, 15);
+  }
+  var pts = [];
+  for (i = 0; i < 96; i++) {
+    h = (i / 96) * 24;
+    prev = (h - 0.25 + 24) % 24;
+    applyDay(ghost, prev, h, 15);
+    pts.push({
+      h: h,
+      temp: ghost.temp,
+      rh: ghost.rh,
+      w: room.powerExpected ? (ghost.watts || 0) : null,
+      v: room.powerExpected ? ghost.volts : null,
+      door: ghost.door ? 1 : 0
+    });
+  }
+  return pts;
+}
+
+window.HoldCurves = function () {
+  var key = state.profileId;
+  if (!curvePack || curveKey !== key) {
+    curveKey = key;
+    curvePack = {
+      profile: state.profileId,
+      rooms: state.rooms.map(function (room) {
+        return { id: room.id, name: room.name, pts: dayCurve(room) };
+      })
+    };
+  }
+  var room = selectedRoom();
+  curvePack.selected = room ? room.id : "";
+  curvePack.unit = state.unit;
+  return curvePack;
+};
+
+function tickRoom(room, prev, h, simMin) {
+  const live = room.envLive || room.powerLive;
+  if (!live) applyDay(room, prev, h, simMin);
+  age(room, live ? 1 / 60 : simMin, live);
   pushSample(room);
 }
 
-function age(room) {
-  const dt = 1 / 60;
+function age(room, simMin, live) {
+  const dt = simMin;
   const outside = room.temp != null && (room.temp > room.band.max || room.temp < room.band.min);
   if (outside) room.excursionMin += dt;
   else room.excursionMin = 0;
   if (room.rhBand && room.rh < room.rhBand.min) room.dryMin += dt;
   else room.dryMin = 0;
   const powerOut = room.powerExpected && room.powerKnown && room.volts != null && room.volts < 40;
-  if (powerOut) room.autonomyLeft = Math.max(0, room.autonomyLeft - dt);
-  if (!room.powerLive && room.powerExpected) room.wh += (room.watts || 0) / 3600;
+  if (live && powerOut) room.autonomyLeft = Math.max(0, room.autonomyLeft - dt);
+  if (!room.powerLive && room.powerExpected) room.wh += (room.watts || 0) * (dt * 60) / 3600;
   if (room.door) {
     if (!room.doorSince) room.doorSince = Date.now();
   } else {
     room.doorSince = 0;
   }
+  if (room.rh != null) room.rh = Math.max(5, Math.min(99, room.rh));
 }
 
 function sampleNow(room) {
@@ -672,18 +717,21 @@ function renderTimelines() {
   const last = samples[samples.length - 1] || {};
   const power = room.powerExpected;
   const specs = [
-    { key: "temp", label: "Temperature " + unitSuffix(), min: room.scale.min, max: room.scale.max, band: [room.band.min, room.band.max], now: deg(room.temp), stroke: "#1f6f58" },
-    { key: "rh", label: "Humidity", min: 0, max: 100, band: room.rhBand ? [room.rhBand.min, room.rhBand.max] : null, now: room.rh == null ? "—" : Math.round(room.rh) + "%", stroke: "#3d6f8a" },
-    { key: "door", label: "Door", min: 0, max: 1, step: true, now: room.door ? "Open" : "Shut", stroke: "#1c1915" },
-    { key: "w", label: "Power", min: 0, max: Math.max(room.runW * 1.5, 80), power: true, now: power && room.watts != null ? Math.round(room.watts) + " W" : "No mains", stroke: "#8a5a12" },
-    { key: "v", label: "Volts", min: 0, max: 260, band: power ? [200, 250] : null, power: true, now: power && room.volts != null ? Math.round(room.volts) + " V" : "No mains", stroke: "#8a5a12" },
-    { key: "hz", label: "Frequency", min: 45, max: 65, power: true, now: power && room.hz ? room.hz.toFixed(1) + " Hz" : "No mains", stroke: "#5e5a53" },
-    { key: "wh", label: "Energy", min: 0, max: Math.max(1, last.wh || 0, room.wh || 0), power: true, now: power ? (room.wh || 0).toFixed(2) + " Wh" : "No mains", stroke: "#8a5a12" },
-    { key: "band", label: "In band", min: 0, max: 1, step: true, now: last.band ? "Yes" : "No", stroke: "#1f6f58" },
-    { key: "hold", label: "Holdover", min: 0, max: Math.max(room.autonomyMin || 1, 1), power: true, now: power ? mins(room.autonomyLeft) : "Passive", stroke: "#3d6f8a" },
-    { key: "risk", label: "Stock at risk", min: 0, max: Math.max(room.qty * room.unitValue, 1), now: money(last.risk || 0), stroke: "#9c2f1c" }
+    { key: "temp", label: "Temperature " + unitSuffix(), min: room.scale.min, max: room.scale.max, band: [room.band.min, room.band.max], now: deg(room.temp), stroke: "#7dcea0" },
+    { key: "rh", label: "Humidity", min: 0, max: 100, band: room.rhBand ? [room.rhBand.min, room.rhBand.max] : null, now: room.rh == null ? "—" : Math.round(room.rh) + "%", stroke: "#7eb0c8" },
+    { key: "door", label: "Door", min: 0, max: 1, step: true, now: room.door ? "Open" : "Shut", stroke: "#d5ddd6" },
+    { key: "w", label: "Power", min: 0, max: Math.max(room.runW * 1.5, 80), power: true, now: power && room.watts != null ? Math.round(room.watts) + " W" : "No mains", stroke: "#e0a84a" },
+    { key: "v", label: "Volts", min: 0, max: 260, band: power ? [200, 250] : null, power: true, now: power && room.volts != null ? Math.round(room.volts) + " V" : "No mains", stroke: "#e0a84a" },
+    { key: "hz", label: "Frequency", min: 45, max: 65, power: true, now: power && room.hz ? room.hz.toFixed(1) + " Hz" : "No mains", stroke: "#93a399" },
+    { key: "wh", label: "Energy", min: 0, max: Math.max(1, last.wh || 0, room.wh || 0), power: true, now: power ? (room.wh || 0).toFixed(2) + " Wh" : "No mains", stroke: "#e0a84a" },
+    { key: "band", label: "In band", min: 0, max: 1, step: true, now: last.band ? "Yes" : "No", stroke: "#7dcea0" },
+    { key: "hold", label: "Holdover", min: 0, max: Math.max(room.autonomyMin || 1, 1), power: true, now: power ? mins(room.autonomyLeft) : "Passive", stroke: "#7eb0c8" },
+    { key: "risk", label: "Stock at risk", min: 0, max: Math.max(room.qty * room.unitValue, 1), now: money(last.risk || 0), stroke: "#e36b52" }
   ];
-  if (head) head.textContent = room.name + " · last two minutes · band drawn where a safe range exists";
+  if (head) {
+    head.textContent = room.name + (room.envLive ? " · last two minutes" : " · fast 06:00–10:00, then slow") +
+      " · band drawn where a safe range exists";
+  }
   host.innerHTML = specs.map(function (spec) {
     if (spec.power && !power) {
       return '<figure class="tl"><figcaption><span>' + esc(spec.label) + '</span><b>' + esc(spec.now) + '</b></figcaption><p class="tl-empty">No mains on this leg.</p></figure>';
@@ -692,28 +740,13 @@ function renderTimelines() {
   }).join("");
 }
 
-function readTranslate(el) {
-  const m = /translate\(\s*([-0-9.]+)[\s,]+([-0-9.]+)/.exec(el.getAttribute("transform") || "");
-  if (!m) return null;
-  return { x: Number(m[1]), y: Number(m[2]) };
-}
-
-function glideShip(el, x, y) {
-  const cur = readTranslate(el) || { x: x, y: y };
-  const fromX = cur.x;
-  const fromY = cur.y;
-  const t0 = performance.now();
-  const token = {};
-  glideShip.token = token;
-  function frame(now) {
-    if (glideShip.token !== token) return;
-    const u = Math.min(1, (now - t0) / 900);
-    const x1 = fromX + (x - fromX) * u;
-    const y1 = fromY + (y - fromY) * u;
-    el.setAttribute("transform", "translate(" + x1.toFixed(1) + " " + y1.toFixed(1) + ")");
-    if (u < 1) requestAnimationFrame(frame);
-  }
-  requestAnimationFrame(frame);
+function planFill(room) {
+  if (room.temp == null) return "#24302a";
+  if (room.freeze != null && room.temp < room.freeze) return "#2a3a4e";
+  const sit = judge(room);
+  if (sit.level === "act") return "#4a2a24";
+  if (sit.level === "watch") return "#3f341c";
+  return "#1e3a30";
 }
 
 function fillFor(room) {
@@ -725,9 +758,51 @@ function fillFor(room) {
   return "#cfe3d6";
 }
 
+function dollRooms() {
+  return state.rooms.map(function (room) {
+    const rh = room.rh == null ? "—" : Math.round(room.rh) + "%";
+    const w = room.powerExpected && room.watts != null ? Math.round(room.watts) + " W" : "passive";
+    return {
+      id: room.id,
+      name: room.name,
+      stock: room.stock,
+      temp: deg(room.temp),
+      sub: rh + " · " + w,
+      fill: planFill(room),
+      open: !!room.door,
+      picked: room.id === state.selected,
+      fan: !!(room.powerExpected && room.volts != null && room.volts > 40 && (room.watts || 0) >= 25),
+      cold: !!(room.freeze != null && room.temp < room.freeze),
+      hot: !!(room.temp != null && room.temp > room.band.max),
+      live: !!(room.powerExpected && room.volts != null && room.volts > 40)
+    };
+  });
+}
+
 function paintPlan() {
   const host = document.getElementById("plan");
   if (!host || !window.HoldPlan) return;
+  const world = state.profileId === "clinic" || state.profileId === "packhouse";
+  if (world) {
+    if (!window.HoldDoll) {
+      if (host.getAttribute("data-profile") !== "world-wait") {
+        host.setAttribute("data-profile", "world-wait");
+        host.textContent = "";
+        host.classList.add("doll-live");
+      }
+      return;
+    }
+    host.setAttribute("data-profile", state.profileId);
+    window.HoldDoll.onPick = function (id) {
+      state.selected = id;
+      state.look = id;
+      saveStore();
+      render();
+    };
+    window.HoldDoll.sync(host, state.profileId, dollRooms());
+    return;
+  }
+  if (window.HoldDoll) window.HoldDoll.stop();
   if (host.getAttribute("data-profile") !== state.profileId) {
     host.setAttribute("data-profile", state.profileId);
     host.innerHTML = window.HoldPlan.markup(state.profileId);
@@ -754,7 +829,7 @@ function paintPlan() {
       feeder.classList.toggle("dead", room.powerExpected && !powered);
     }
     const fill = g.querySelector(".zone-fill");
-    if (fill) fill.setAttribute("fill", fillFor(room));
+    if (fill) fill.style.fill = planFill(room);
     const mist = g.querySelector(".mist");
     if (mist) mist.setAttribute("opacity", room.rh == null ? 0 : Math.max(0, Math.min(0.42, room.rh / 100 * 0.45)).toFixed(2));
     const readout = g.querySelector(".readout");
@@ -766,12 +841,6 @@ function paintPlan() {
       sub.textContent = rh + " · " + w;
     }
   });
-  const ship = host.querySelector("#shipper");
-  const route = state.rooms.filter(function (r) { return r.id === "route"; })[0];
-  if (ship && route && window.HoldPlan.shipPath) {
-    const at = pointOnLine(window.HoldPlan.shipPath, route.along || 0);
-    glideShip(ship, at[0], at[1]);
-  }
   const dock = host.querySelector("#dock");
   const market = state.rooms.filter(function (r) { return r.id === "out"; })[0];
   if (dock && market) dock.classList.toggle("open", !!market.door || (market.temp != null && market.temp > market.band.max));
@@ -937,7 +1006,61 @@ function renderChip() {
   else chip.textContent = "Simulated floor";
 }
 
+function paintScene() {
+  if (!window.HoldScene) return;
+  HoldScene.sync({
+    profileId: state.profileId,
+    route: null,
+    look: state.look || null,
+    rooms: state.rooms.map(function (room) {
+      return {
+        id: room.id,
+        name: room.name,
+        lng: room.lng,
+        lat: room.lat,
+        fill: fillFor(room),
+        text: deg(room.temp),
+        selected: room.id === state.selected,
+        door: !!room.door
+      };
+    })
+  });
+  state.look = null;
+}
+
+var stageWorld = null;
+
+function placeStage(world) {
+  if (stageWorld === world) return;
+  stageWorld = world;
+  var fit = document.getElementById("fit");
+  var day = document.getElementById("day");
+  var plan = document.getElementById("plan");
+  var scene = document.querySelector(".scene-wrap");
+  var detail = document.getElementById("detail");
+  var body = document.getElementById("detail-body");
+  if (!fit || !day || !plan || !scene || !detail) return;
+  if (world) {
+    fit.insertBefore(plan, day);
+    if (body) detail.insertBefore(scene, body);
+    else detail.appendChild(scene);
+  } else {
+    fit.insertBefore(scene, day);
+    if (body) detail.insertBefore(plan, body);
+    else detail.appendChild(plan);
+  }
+  requestAnimationFrame(function () { window.dispatchEvent(new Event("resize")); });
+}
+
 function render() {
+  var detail = document.getElementById("detail");
+  var world = state.profileId === "clinic" || state.profileId === "packhouse";
+  if (detail) {
+    detail.classList.toggle("in-clinic", state.profileId === "clinic");
+    detail.classList.toggle("has-world", world);
+  }
+  placeStage(world);
+  document.body.setAttribute("data-trade", state.profileId);
   renderStrip();
   renderUnit();
   paintPlan();
@@ -946,6 +1069,8 @@ function render() {
   renderTimelines();
   renderFeed();
   renderChip();
+  paintScene();
+  if (window.HoldDay) HoldDay.paint(state.profileId);
 }
 
 function rememberLevel() {
@@ -1037,7 +1162,6 @@ function applyGeoJSON(msg) {
     if (geom.coordinates && geom.coordinates.length >= 2) {
       room.lng = Number(geom.coordinates[0]);
       room.lat = Number(geom.coordinates[1]);
-      if (room.id === "route" && ROUTES.dispatch) room.along = fractionAlong(ROUTES.dispatch, room.lng, room.lat);
     }
     if (p.place) room.place = p.place;
     if (p.deviceId && (!room.deviceId || room.deviceId.indexOf("sim-") === 0)) room.deviceId = p.deviceId;
@@ -1196,9 +1320,30 @@ function boot() {
   state.rooms = buildRooms(state.profileId);
   state.selected = state.rooms.some(function (r) { return r.id === store.selected; }) ? store.selected : state.rooms[0].id;
   renderSwitch();
+  if (window.HoldScene) {
+    HoldScene.attach(
+      document.getElementById("scene"),
+      document.getElementById("scene-labels"),
+      document.getElementById("scene-meta"),
+      document.getElementById("scene-wide")
+    );
+    HoldScene.onPick = function (id) {
+      state.selected = id;
+      state.look = id;
+      saveStore();
+      render();
+    };
+  }
   note("Simulated floor. A MeshEMS board replaces a room when you bind its id.");
   rememberLevel();
   render();
+  var detail = document.getElementById("detail");
+  function showScene() {
+    if (detail) detail.scrollTop = 0;
+  }
+  showScene();
+  requestAnimationFrame(showScene);
+  window.addEventListener("load", showScene);
 
   document.getElementById("unit").addEventListener("click", function (ev) {
     const btn = ev.target.closest("[data-unit]");
@@ -1211,7 +1356,11 @@ function boot() {
   document.getElementById("switch").addEventListener("click", function (ev) {
     const btn = ev.target.closest("[data-profile]");
     if (!btn) return;
-    state.profileId = btn.getAttribute("data-profile");
+    const next = btn.getAttribute("data-profile");
+    if (next === state.profileId) return;
+    state.profileId = next;
+    if (window.HoldDay && HoldDay.restart) HoldDay.restart();
+    simPrev = window.HoldDay ? HoldDay.hour() : 6;
     state.rooms = buildRooms(state.profileId);
     if (state.inbox[state.profileId]) applyGeoJSON(state.inbox[state.profileId]);
     state.selected = state.rooms[0].id;
@@ -1226,6 +1375,7 @@ function boot() {
     const btn = ev.target.closest("[data-room]");
     if (!btn) return;
     state.selected = btn.getAttribute("data-room");
+    state.look = state.selected;
     saveStore();
     render();
   });
@@ -1234,6 +1384,7 @@ function boot() {
     const zone = ev.target.closest("[data-room]");
     if (!zone) return;
     state.selected = zone.getAttribute("data-room");
+    state.look = state.selected;
     saveStore();
     render();
   });
@@ -1283,10 +1434,16 @@ function boot() {
   });
 
   setInterval(function () {
-    state.rooms.forEach(tickRoom);
+    const h = window.HoldDay ? window.HoldDay.hour() : 0;
+    let d = h - simPrev;
+    if (d < 0) d += 24;
+    const simMin = d * 60;
+    state.rooms.forEach(function (room) { tickRoom(room, simPrev, h, simMin); });
+    simPrev = h;
     rememberLevel();
     render();
   }, 1000);
 }
 
+window.HoldRepaint = render;
 boot();

@@ -1,14 +1,7 @@
 // Illustrative sites. Points are not surveyed facilities.
 // GeoJSON coordinates are [longitude, latitude].
 
-export const ROUTE = {
-  dispatch: [
-    [36.8524, -1.3192],
-    [36.9800, -1.3800],
-    [37.1200, -1.4500],
-    [37.2630, -1.5170]
-  ]
-};
+export const ROUTE = {};
 
 const SITES = {
   clinic: [
@@ -24,14 +17,14 @@ const SITES = {
     })
   ],
   landing: [
-    room("ice", "Ice hold", "Landing", [39.8491, -3.6362], {
+    room("ice", "Ice hold", "Landing", [39.84915, -3.63400], {
       script: "hold", band: [-1, 2], temp: 0.4, rh: 88, watts: 180, runW: 220, volts: 228
     }),
-    room("day", "Day catch", "Landing", [39.8502, -3.6354], {
+    room("day", "Day catch", "Landing", [39.84975, -3.63405], {
       script: "door", band: [0, 4], temp: 7.8, rh: 80, watts: 240, runW: 200, volts: 226,
       doorMs: 35 * 60000
     }),
-    room("blast", "Blast", "Landing", [39.8482, -3.6370], {
+    room("blast", "Blast", "Landing", [39.84855, -3.63408], {
       script: "hold", band: [-22, -15], temp: -18.4, rh: 70, watts: 1320, runW: 1400, volts: 229
     })
   ],
@@ -44,19 +37,6 @@ const SITES = {
     }),
     room("out", "Market cooler", "Packhouse", [36.4346, -0.7362], {
       script: "outage", band: [4, 8], temp: 6.4, rh: 78, watts: 0, runW: 350, volts: 0
-    })
-  ],
-  dispatch: [
-    room("hub", "Hub vaccines", "Dispatch hub", [36.8524, -1.3192], {
-      script: "hold", band: [2, 8], temp: 5.1, rh: 52, watts: 110, runW: 120, volts: 230
-    }),
-    room("blood", "Blood bay", "Dispatch hub", [36.8532, -1.3186], {
-      script: "door", band: [2, 6], temp: 8.6, rh: 70, watts: 140, runW: 130, volts: 227,
-      doorMs: 16 * 60000
-    }),
-    room("route", "Route shipper", "Route 4 · passive", [36.9400, -1.3600], {
-      script: "warm", band: [2, 8], temp: 13.2, rh: 58, watts: 0, volts: null,
-      powerExpected: false, along: 0.18
     })
   ]
 };

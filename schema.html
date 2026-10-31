@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Hold · MQTT subtopics</title>
+<link rel="stylesheet" href="hold.css?v=27">
+<style>
+  .spec { max-width: 78ch; margin: 0 auto; padding: 28px 22px 64px; }
+  .spec h1 { font-family: var(--serif); font-weight: 560; font-size: 34px; margin: 0; }
+  .spec h2 { font-family: var(--serif); font-weight: 560; font-size: 22px; margin: 28px 0 8px; }
+  .spec p, .spec li { color: var(--ink); }
+  .spec .dim, .spec caption { color: var(--dim); }
+  .spec a { color: var(--safe); }
+  .spec code, .spec pre { font-family: var(--mono); font-size: 13px; }
+  .spec pre {
+    background: var(--list);
+    border: 1px solid var(--line);
+    border-radius: 8px;
+    padding: 12px 14px;
+    overflow: auto;
+    color: var(--ink);
+  }
+  .spec table { width: 100%; border-collapse: collapse; font-size: 14px; margin: 8px 0 16px; }
+  .spec th, .spec td { text-align: left; vertical-align: top; border-bottom: 1px solid var(--line); padding: 6px 8px 6px 0; }
+  .spec th { color: var(--dim); font-weight: 560; }
+  .spec .tag { font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--watch); }
+</style>
+</head>
+<body>
+<article class="spec">
+  <p class="dim"><a href="index.html">Hold</a> · MQTT contract</p>
+  <h1>Subtopic schema</h1>
+  <p>MeshEMS publishes JSON. The desk only listens. Temperature on the wire is always Celsius. One board keeps the relay and the setpoint. Nothing in this page is a command.</p>
+  <p>The same two payloads cover a clinic cabinet, a fish hold, and a packhouse room. A site with several cold systems repeats the environment payload, once per system. Bands, stock, and money stay on the desk. They are not sensor fields.</p>
+
+  <h2>Topics</h2>
+  <p>Prefix <code>openami</code>. Device id is the board id, for example <code>StreetPoleEMS_…</code>. The firmware builds <code>openami/&lt;deviceId&gt;/</code> and appends the subtopic. Payload is one JSON object, UTF-8, under 1024 bytes.</p>
+  <pre>openami/&lt;deviceId&gt;/subpanel_ENV
+openami/&lt;deviceId&gt;/subpanel_3Ph
+openami/&lt;deviceId&gt;/room/&lt;roomId&gt;/env
+openami/&lt;deviceId&gt;/room/&lt;roomId&gt;/power
+openami/geojson/&lt;profile&gt;</pre>
+  <table>
+    <thead><tr><th>Subtopic</th><th>Who publishes</th><th>Desk today</th></tr></thead>
+    <tbody>
+      <tr><td><code>subpanel_ENV</code></td><td>Board. One probe on this device.</td><td>Read. Binds to one room.</td></tr>
+      <tr><td><code>subpanel_3Ph</code></td><td>Board. The subpanel meter.</td><td>Read. Same room as that device id.</td></tr>
+      <tr><td><code>room/&lt;roomId&gt;/env</code></td><td>Proposed. Same JSON as <code>subpanel_ENV</code>, one cabinet.</td><td>Not routed yet.</td></tr>
+      <tr><td><code>room/&lt;roomId&gt;/power</code></td><td>Proposed. Same JSON as <code>subpanel_3Ph</code>, if that cabinet is metered alone.</td><td>Not routed yet.</td></tr>
+      <tr><td><code>geojson/&lt;profile&gt;</code></td><td>Simulator. <code>clinic</code>, <code>landing</code>, <code>packhouse</code>.</td><td>Read. A live board on a room wins.</td></tr>
+    </tbody>
+  </table>
+  <p class="dim">Ignored on purpose: <code>meter_N</code>, <code>subpanel_MFR</code>, <code>subpanel_harmonics</code>, bandwidth stats, and the plain-text <code>door</code> topic (<code>open</code> / <code>closed</code>). Door state that the desk uses is the boolean inside the environment JSON.</p>
+
+  <h2>Rules for every trade</h2>
+  <ul>
+    <li><code>temperature_C</code> is degrees Celsius. The desk may display Fahrenheit. It does not write Fahrenheit back.</li>
+    <li><code>temperature_C: 0</code> together with <code>humidity_percent: 0</code> means the probe is not live. The desk keeps the last real sample.</li>
+    <li><code>location_text</code> of <code>North_Pole</code> or <code>Unknown Location</code> is the firmware placeholder. The desk ignores it.</li>
+    <li><code>door_open_duration_ms</code> is the length of the opening that just finished. While the door is open the desk times it locally. A hatch, a lid, and a cabinet door are the same boolean.</li>
+    <li><code>WphA</code>, <code>WphB</code>, <code>WphC</code> are watts. <code>PhVphA/B/C</code> are volts. <code>TotWhImport</code> is watt-hours since the meter started, already scaled. The desk shows the change since it first saw the counter.</li>
+    <li>All phase volts under about 40 V is a supply loss. Watts still sum.</li>
+    <li><code>timestamp_ms</code> on the board is <code>millis()</code>, not a Unix time.</li>
+    <li><code>latitude_deg</code> and <code>longitude_deg</code> are on the environment object. The desk does not move a map pin from them. Position for a simulated feed is the GeoJSON point, <code>[longitude, latitude]</code>.</li>
+    <li>One device id binds to one room. A second room needs its own environment publication. A real id that is already live is not overwritten by a <code>sim-</code> point.</li>
+    <li>The desk does not publish <code>…/cmd</code>.</li>
+  </ul>
+
+  <h2>subpanel_ENV</h2>
+  <p><span class="tag">Live</span> Environment for the probe on this device. Clinic lid, landing hatch, and packhouse door use this object.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Type</th><th>Desk</th></tr></thead>
+    <tbody>
+      <tr><td><code>temperature_C</code></td><td>number, °C</td><td>Room temperature. Required for a live probe.</td></tr>
+      <tr><td><code>humidity_percent</code></td><td>number, 0–100</td><td>Relative humidity. Required beside temperature.</td></tr>
+      <tr><td><code>door_open</code></td><td>boolean</td><td>True while the lid, hatch, or door is open.</td></tr>
+      <tr><td><code>door_open_duration_ms</code></td><td>number, ms</td><td>Last completed opening. Meaningful after close.</td></tr>
+      <tr><td><code>location_text</code></td><td>string</td><td>Place label, after the placeholders are dropped.</td></tr>
+      <tr><td><code>latitude_deg</code></td><td>number</td><td>Published. Not used for the pin.</td></tr>
+      <tr><td><code>longitude_deg</code></td><td>number</td><td>Published. Not used for the pin.</td></tr>
+      <tr><td><code>altitude_m</code></td><td>number</td><td>Published. Not read.</td></tr>
+      <tr><td><code>model_id</code>, <code>length</code></td><td>number</td><td>SunSpec header. Not read.</td></tr>
+      <tr><td><code>timestamp_ms</code></td><td>number</td><td>Board uptime. Not a clock.</td></tr>
+      <tr><td><code>last_modbus_update_ms</code>, <code>last_gpio_update_ms</code></td><td>number</td><td>Not read.</td></tr>
+    </tbody>
+  </table>
+  <pre>{
+  "model_id": 307,
+  "location_text": "Vaccine cabinet",
+  "latitude_deg": 0.5144,
+  "longitude_deg": 34.7682,
+  "altitude_m": 0,
+  "temperature_C": 4.6,
+  "humidity_percent": 48,
+  "door_open": false,
+  "door_open_duration_ms": 8400,
+  "timestamp_ms": 1200344
+}</pre>
+
+  <h2>subpanel_3Ph</h2>
+  <p><span class="tag">Live</span> Subpanel meter. One object for the supply this device is on. Omit this topic for a passive box.</p>
+  <table>
+    <thead><tr><th>Field</th><th>Unit</th><th>Desk</th></tr></thead>
+    <tbody>
+      <tr><td><code>WphA</code> <code>WphB</code> <code>WphC</code></td><td>W</td><td>Sum is the room watts.</td></tr>
+      <tr><td><code>PhVphA</code> <code>PhVphB</code> <code>PhVphC</code></td><td>V</td><td>First phase above 40 V, else the first value.</td></tr>
+      <tr><td><code>Hz</code></td><td>Hz</td><td>Shown.</td></tr>
+      <tr><td><code>TotWhImport</code></td><td>Wh</td><td>Cumulative import. Desk stores the delta.</td></tr>
+      <tr><td><code>AphA/B/C</code></td><td>A</td><td>Published. Not read.</td></tr>
+      <tr><td><code>PFphA/B/C</code>, <code>VAphA/B/C</code>, <code>VarphA/B/C</code></td><td>SunSpec</td><td>Not read.</td></tr>
+      <tr><td><code>TotWhExport</code> and the hour, day, and TOU counters</td><td>Wh</td><td>Not read.</td></tr>
+    </tbody>
+  </table>
+  <pre>{
+  "Hz": 50.0,
+  "WphA": 72,
+  "WphB": 0,
+  "WphC": 0,
+  "PhVphA": 232,
+  "PhVphB": 0,
+  "PhVphC": 0,
+  "TotWhImport": 18440.5
+}</pre>
+  <p class="dim">A single-phase cabinet still uses <code>WphA</code> and <code>PhVphA</code>. Leave B and C at 0. Do not send kilowatts in those fields.</p>
+
+  <h2>Several cold systems on one node</h2>
+  <p><span class="tag">Proposed</span> When one MeshEMS watches more than one cabinet, repeat the environment object. The keys do not change. The room id is the path, not a new field.</p>
+  <pre>openami/&lt;deviceId&gt;/room/vaccine/env
+openami/&lt;deviceId&gt;/room/oxy/env
+openami/&lt;deviceId&gt;/room/insulin/env
+openami/&lt;deviceId&gt;/subpanel_3Ph</pre>
+  <p>Shared supply stays on <code>subpanel_3Ph</code>. Publish <code>room/&lt;roomId&gt;/power</code> only when that cabinet has its own meter. The JSON there is the 3Ph object.</p>
+  <p>Until the desk routes <code>room/…</code>, give each cold system its own device id and publish <code>subpanel_ENV</code> on each. Put <code>subpanel_3Ph</code> on the id that owns the meter. That path works on the desk now.</p>
+  <p>Room ids the desk already knows:</p>
+  <table>
+    <thead><tr><th>Profile</th><th>roomId</th><th>What the reading is</th><th>Power</th></tr></thead>
+    <tbody>
+      <tr><td>clinic</td><td><code>vaccine</code></td><td>Cabinet, 2–8 °C. Freeze and heat are both losses. The desk decides that from <code>temperature_C</code>.</td><td>Site meter, or this room’s meter.</td></tr>
+      <tr><td>clinic</td><td><code>oxy</code></td><td>Oxytocin cabinet. <code>door_open</code> is the lid. Each opening is a short true, not an all-day true.</td><td>Same.</td></tr>
+      <tr><td>clinic</td><td><code>insulin</code></td><td>Small box. A temperature under 2 °C is the freeze fault. No extra field.</td><td>Same.</td></tr>
+      <tr><td>landing</td><td><code>ice</code></td><td>Ice hold. <code>door_open</code> is the hatch.</td><td>Meter on this hold, or the landing subpanel.</td></tr>
+      <tr><td>landing</td><td><code>day</code></td><td>Day’s catch. Same environment object.</td><td>Same.</td></tr>
+      <tr><td>landing</td><td><code>blast</code></td><td>Blast freezer. Temperature is far below 0 °C. Still <code>temperature_C</code>.</td><td>This one draws hard. Prefer its own <code>power</code> if the meter is on the blast.</td></tr>
+      <tr><td>packhouse</td><td><code>leaf</code></td><td>Leafy room. <code>humidity_percent</code> is the crop signal. Dry air is a desk judgment against the room’s band, not a firmware enum.</td><td>Subpanel.</td></tr>
+      <tr><td>packhouse</td><td><code>tomato</code></td><td>Tomato room. Same object, different desk band.</td><td>Subpanel.</td></tr>
+      <tr><td>packhouse</td><td><code>out</code></td><td>Market cooler. Supply loss is volts near 0 on the 3Ph object, not a status string.</td><td>This room’s meter when it is the one that drops.</td></tr>
+    </tbody>
+  </table>
+
+  <h2>Simulated multi-room feed</h2>
+  <p><span class="tag">Live for the demo</span> Topic <code>openami/geojson/&lt;profile&gt;</code>. Body is a GeoJSON FeatureCollection. Each cold system is a Point. Coordinates are <code>[longitude, latitude]</code>. Properties carry the same MeshEMS fields plus routing keys.</p>
+  <table>
+    <thead><tr><th>Property</th><th>Use</th></tr></thead>
+    <tbody>
+      <tr><td><code>profile</code></td><td><code>clinic</code>, <code>landing</code>, or <code>packhouse</code>.</td></tr>
+      <tr><td><code>room</code></td><td>Room id from the table above.</td></tr>
+      <tr><td><code>deviceId</code></td><td><code>sim-&lt;profile&gt;-&lt;room&gt;</code>. A real board id must not use the <code>sim-</code> prefix.</td></tr>
+      <tr><td><code>illustrative</code></td><td><code>true</code> on simulated points.</td></tr>
+      <tr><td><code>power_expected</code></td><td><code>true</code> when the room has mains. <code>false</code> means omit the watt and volt keys.</td></tr>
+      <tr><td><code>temperature_C</code>, <code>humidity_percent</code>, <code>door_open</code>, <code>door_open_duration_ms</code></td><td>Same meaning as <code>subpanel_ENV</code>.</td></tr>
+      <tr><td><code>WphA</code>, <code>WphB</code>, <code>WphC</code>, <code>PhVphA</code>, <code>PhVphB</code>, <code>PhVphC</code>, <code>Hz</code>, <code>TotWhImport</code></td><td>Same meaning as <code>subpanel_3Ph</code>. Omit them when <code>power_expected</code> is false.</td></tr>
+      <tr><td><code>band_min_C</code>, <code>band_max_C</code></td><td>Optional hint. The desk’s room band is the one on screen.</td></tr>
+    </tbody>
+  </table>
+  <p>A blast freezer is the same feature with a temperature near −18 °C. A leafy room is the same feature with <code>humidity_percent</code> in the crop’s range. No second schema.</p>
+  <pre>{
+  "type": "Feature",
+  "geometry": { "type": "Point", "coordinates": [34.7682, 0.5144] },
+  "properties": {
+    "profile": "clinic",
+    "room": "vaccine",
+    "deviceId": "sim-clinic-vaccine",
+    "illustrative": true,
+    "power_expected": true,
+    "temperature_C": 4.6,
+    "humidity_percent": 48,
+    "door_open": false,
+    "door_open_duration_ms": 0,
+    "WphA": 72,
+    "WphB": 0,
+    "WphC": 0,
+    "PhVphA": 232,
+    "PhVphB": 0,
+    "PhVphC": 0,
+    "Hz": 50,
+    "TotWhImport": 120.4
+  }
+}</pre>
+
+  <h2>What is not a feed</h2>
+  <p>Safe band, freeze threshold, humidity band, stock count, price, holdover hours, and the action sentence are operator settings on the desk. Outage, freeze, dry air, and a warm lid are judgments from the fields above. Do not add <code>status</code>, <code>alarm</code>, or <code>temperature_F</code> to the board payload.</p>
+</article>
+</body>
+</html>
