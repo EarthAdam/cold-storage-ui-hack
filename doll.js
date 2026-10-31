@@ -303,6 +303,7 @@ var drops = [];
 var folk = [];
 var clinicDoor = null;
 var bank = null;
+var circuit = null;
 var CLINIC_MARKS = [];
 var LOOK = {
   vaccine: 0xf7f4ef,
@@ -385,6 +386,7 @@ function emptyScene() {
   folk = [];
   clinicDoor = null;
   bank = null;
+  circuit = null;
   cabs = [];
   wireMat = null;
   if (!scene) return;
@@ -493,6 +495,253 @@ function dripRow(x0, span, z, phase) {
   drops.push(drop);
 }
 
+function glowMat(color, intensity) {
+  return new THREE.MeshStandardMaterial({
+    color: color,
+    roughness: 0.35,
+    metalness: 0.45,
+    emissive: color,
+    emissiveIntensity: intensity == null ? 0.35 : intensity
+  });
+}
+
+function bar(x1, y1, z1, x2, y2, z2, color, thick) {
+  var dx = x2 - x1;
+  var dy = y2 - y1;
+  var dz = z2 - z1;
+  var len = Math.hypot(dx, dy, dz) || 0.01;
+  var t = thick || 0.12;
+  var mesh = new THREE.Mesh(new THREE.BoxGeometry(len, t, t * 1.5), glowMat(color, 0.4));
+  mesh.position.set((x1 + x2) / 2, (y1 + y2) / 2, (z1 + z2) / 2);
+  mesh.quaternion.setFromUnitVectors(new THREE.Vector3(1, 0, 0), new THREE.Vector3(dx, dy, dz).normalize());
+  scene.add(mesh);
+  return mesh;
+}
+
+function setGlow(mesh, hex, intensity) {
+  if (!mesh || !mesh.material) return;
+  mesh.material.color.setHex(hex);
+  mesh.material.emissive.setHex(hex);
+  mesh.material.emissiveIntensity = intensity;
+}
+
+function tag(name, temp, sub, x, y, z, sx) {
+  var label = makeLabel();
+  label.sprite.position.set(x, y, z);
+  var w = sx || 2.4;
+  label.sprite.scale.set(w, w * 0.5, 1);
+  paintLabel(label, { name: name, temp: temp || "", sub: sub || "", stock: "" });
+  scene.add(label.sprite);
+  return label;
+}
+
+function makeContactor(x, z) {
+  var g = new THREE.Group();
+  g.position.set(x, 0, z);
+  var post = mat(0xe4e0d4, 0.35, 0.35);
+  g.add(box(0.18, 0.5, 0.18, post, 0, 0.55, 0));
+  g.add(box(0.18, 0.5, 0.18, post, 1.25, 0.55, 0));
+  var hinge = new THREE.Group();
+  hinge.position.set(0, 0.78, 0);
+  var blade = new THREE.Mesh(new THREE.BoxGeometry(1.25, 0.08, 0.16), glowMat(0xe6c56a, 0.25));
+  blade.position.x = 0.62;
+  hinge.add(blade);
+  g.add(hinge);
+  scene.add(g);
+  return { hinge: hinge, blade: blade };
+}
+
+function buildCircuit() {
+  scene.add(box(0.32, 3.4, 0.32, mat(0x2c261c, 0.7, 0.08), -4.2, 1.7, 12.2));
+  var emsMat = new THREE.MeshStandardMaterial({
+    color: 0x14201a,
+    roughness: 0.4,
+    metalness: 0.25,
+    emissive: 0x3d9a4a,
+    emissiveIntensity: 0.25
+  });
+  var ems = box(1.55, 1.75, 0.36, emsMat, -4.2, 2.05, 12.55);
+  scene.add(ems);
+  var emsLabel = tag("Street-EMS", "on phase B", "box on the pole", -4.2, 3.6, 12.2, 3.4);
+  tag("Pole", "mains", "three phase in", -4.2, 4.6, 12.2, 2.2);
+
+  var A = 0xe6c56a;
+  var B = 0x7dcea0;
+  var C = 0x3aa0d8;
+  var dropA = bar(-3.5, 3.15, 12.2, -1.2, 0.72, 10.0, A);
+  var dropB = bar(-3.5, 3.15, 12.2, -1.2, 0.72, 12.2, B);
+  var dropC = bar(-3.5, 3.15, 12.2, -1.2, 0.72, 14.4, C);
+  var bIn = bar(-1.2, 0.72, 12.2, 0.2, 0.72, 12.2, B);
+  var jumper = bar(0.2, 0.72, 12.2, 1.25, 0.72, 12.2, B);
+  var faultOrb = new THREE.Mesh(new THREE.OctahedronGeometry(0.32, 0), glowMat(0xe24b4b, 0.9));
+  faultOrb.position.set(0.7, 1.05, 12.2);
+  faultOrb.visible = false;
+  scene.add(faultOrb);
+  var faultLabel = tag("Incomer", "B down", "before the cooler", 0.8, 2.15, 12.2, 2.8);
+  faultLabel.sprite.visible = false;
+
+  var aBus = bar(-1.2, 0.72, 10.0, 8.4, 0.72, 10.0, A);
+  var bBus = bar(1.25, 0.72, 12.2, 8.4, 0.72, 12.2, B);
+  var cBus = bar(-1.2, 0.72, 14.4, 8.4, 0.72, 14.4, C);
+  tag("Leafy", "A", "stays on A", 3.4, 1.7, 9.15, 2.3);
+  tag("Cooler", "B", "starts on B", 4.6, 1.7, 13.35, 2.3);
+  tag("Tomato", "C", "stays on C", 3.4, 1.7, 15.55, 2.3);
+
+  var leafFeed = bar(1.0, 0.72, 10.0, 0.4, 0.55, 8.15, A);
+  var tomatoFeed = bar(3.2, 0.72, 14.4, 3.2, 0.55, 8.15, C);
+  var bSw = makeContactor(8.5, 12.2);
+  var aSw = makeContactor(8.5, 10.0);
+  aSw.hinge.rotation.y = 1.15;
+  var coolFromB = bar(9.75, 0.72, 12.2, 6.35, 0.55, 8.2, B);
+  var coolFromA = bar(9.75, 0.72, 10.0, 5.65, 0.55, 8.2, A);
+
+  var line = feederLine([
+    { x: -4.2, z: 12.2, h: 3.55, skipPost: true },
+    { x: -8, z: 1, h: 4.3 },
+    { x: -14, z: -10, h: 4.6 },
+    { x: -21, z: -22, h: 5.0 },
+    { x: -30, z: -36, h: 5.4 },
+    { x: -40, z: -52, h: 5.8 }
+  ], { A: A, B: B, C: C });
+
+  circuit = {
+    emsMat: emsMat,
+    emsLabel: emsLabel,
+    dropA: dropA,
+    dropB: dropB,
+    dropC: dropC,
+    bIn: bIn,
+    jumper: jumper,
+    faultOrb: faultOrb,
+    faultLabel: faultLabel,
+    aBus: aBus,
+    bBus: bBus,
+    cBus: cBus,
+    leafFeed: leafFeed,
+    tomatoFeed: tomatoFeed,
+    bSw: bSw,
+    aSw: aSw,
+    coolFromB: coolFromB,
+    coolFromA: coolFromA,
+    lineA: line.A,
+    lineB: line.B,
+    lineC: line.C
+  };
+}
+
+function catenary(a, b, color, sag) {
+  var meshes = [];
+  var n = 5;
+  var i;
+  var px = a.x;
+  var py = a.y;
+  var pz = a.z;
+  for (i = 1; i <= n; i++) {
+    var t = i / n;
+    var x = a.x + (b.x - a.x) * t;
+    var z = a.z + (b.z - a.z) * t;
+    var y = a.y + (b.y - a.y) * t - Math.sin(Math.PI * t) * sag;
+    meshes.push(bar(px, py, pz, x, y, z, color, 0.16));
+    px = x;
+    py = y;
+    pz = z;
+  }
+  return meshes;
+}
+
+function feederLine(poles, colors) {
+  var out = { A: [], B: [], C: [] };
+  var i;
+  for (i = 0; i < poles.length; i++) {
+    var p = poles[i];
+    if (!p.skipPost) {
+      scene.add(box(0.24, p.h, 0.24, mat(0x3a3328, 0.75, 0.05), p.x, p.h / 2, p.z));
+    }
+    var prev = poles[Math.max(0, i - 1)];
+    var next = poles[Math.min(poles.length - 1, i + 1)];
+    var dx = next.x - prev.x;
+    var dz = next.z - prev.z;
+    var len = Math.hypot(dx, dz) || 1;
+    var px = -dz / len;
+    var pz = dx / len;
+    var y = p.h - 0.2;
+    var arm = 0.9;
+    bar(p.x - px * arm, y, p.z - pz * arm, p.x + px * arm, y, p.z + pz * arm, 0x6a5438, 0.1);
+    p.A = { x: p.x - px * arm, y: y, z: p.z - pz * arm };
+    p.B = { x: p.x, y: y, z: p.z };
+    p.C = { x: p.x + px * arm, y: y, z: p.z + pz * arm };
+  }
+  for (i = 0; i < poles.length - 1; i++) {
+    var sag = 0.55 + i * 0.08;
+    out.A = out.A.concat(catenary(poles[i].A, poles[i + 1].A, colors.A, sag));
+    out.B = out.B.concat(catenary(poles[i].B, poles[i + 1].B, colors.B, sag));
+    out.C = out.C.concat(catenary(poles[i].C, poles[i + 1].C, colors.C, sag));
+  }
+  return out;
+}
+
+function paintList(list, hex, intensity) {
+  var i;
+  if (!list) return;
+  for (i = 0; i < list.length; i++) setGlow(list[i], hex, intensity);
+}
+
+function paintCircuit(hour, now) {
+  if (!circuit) return;
+  var sup = window.HoldSupply && hour != null ? window.HoldSupply(hour) : { step: "hold", fault: false };
+  var step = sup.step || "hold";
+  var fault = !!sup.fault;
+  var bClosed = step === "hold" || step === "fault";
+  var aClosed = step === "make" || step === "run";
+  var k = reduce ? 1 : 0.18;
+  circuit.bSw.hinge.rotation.y += ((bClosed ? 0 : -1.15) - circuit.bSw.hinge.rotation.y) * k;
+  circuit.aSw.hinge.rotation.y += ((aClosed ? 0 : 1.15) - circuit.aSw.hinge.rotation.y) * k;
+
+  setGlow(circuit.dropA, 0xe6c56a, 0.45);
+  setGlow(circuit.aBus, 0xe6c56a, 0.45);
+  setGlow(circuit.leafFeed, 0xe6c56a, 0.45);
+  setGlow(circuit.dropC, 0x3aa0d8, 0.45);
+  setGlow(circuit.cBus, 0x3aa0d8, 0.45);
+  setGlow(circuit.tomatoFeed, 0x3aa0d8, 0.45);
+  setGlow(circuit.dropB, fault ? 0xe24b4b : 0x7dcea0, fault ? 0.15 : 0.45);
+  paintList(circuit.lineA, 0xe6c56a, 0.45);
+  paintList(circuit.lineC, 0x3aa0d8, 0.45);
+  paintList(circuit.lineB, fault ? 0xe24b4b : 0x7dcea0, fault ? 0.22 : 0.45);
+  setGlow(circuit.bIn, fault ? 0xe24b4b : 0x7dcea0, fault ? 0.85 : 0.45);
+  setGlow(circuit.bBus, fault ? 0x5c3030 : 0x7dcea0, fault ? 0.08 : 0.45);
+  circuit.jumper.visible = !fault;
+  circuit.faultOrb.visible = fault;
+  circuit.faultLabel.sprite.visible = fault;
+  if (fault && !reduce) {
+    var pulse = 0.4 + 0.6 * Math.sin(now / 180);
+    circuit.faultOrb.material.emissiveIntensity = pulse;
+    circuit.faultOrb.scale.setScalar(0.8 + 0.35 * pulse);
+  }
+
+  var bCarry = bClosed && !fault;
+  setGlow(circuit.coolFromB, bClosed && fault ? 0xe24b4b : 0x7dcea0, bCarry ? 0.7 : 0.08);
+  setGlow(circuit.coolFromA, 0xe6c56a, aClosed ? 0.8 : 0.05);
+  setGlow(circuit.bSw.blade, bCarry ? 0x7dcea0 : (bClosed ? 0xe24b4b : 0x8a8478), bClosed ? 0.6 : 0.05);
+  setGlow(circuit.aSw.blade, 0xe6c56a, aClosed ? 0.75 : 0.05);
+
+  var emsHex = (step === "break" || step === "make") ? 0xe6c56a : (step === "fault" ? 0xe24b4b : 0x3d9a4a);
+  circuit.emsMat.emissive.setHex(emsHex);
+  circuit.emsMat.emissiveIntensity = step === "hold" ? 0.2 : 0.75;
+  var line = {
+    hold: "on phase B",
+    fault: "sees B down",
+    break: "opens off B",
+    make: "closes onto A",
+    run: "now on A"
+  }[step] || "";
+  paintLabel(circuit.emsLabel, {
+    name: "Street-EMS",
+    temp: line,
+    sub: "box on the pole",
+    stock: "SIM"
+  });
+}
+
 function buildFarm() {
   scene.background = new THREE.Color(0x14301c);
   addLights(true);
@@ -585,20 +834,21 @@ function buildFarm() {
     scene.add(pad.group);
     cabs.push(pad);
   });
+  buildCircuit();
 }
 
 function aimView(profile) {
   if (profile === "packhouse") {
-    camera.position.set(2, 54, 38);
-    camera.far = 220;
-    controls.target.set(2, 0, 2);
-    controls.minDistance = 24;
-    controls.maxDistance = 96;
-    controls.maxPolarAngle = 0.95;
-    controls.minPolarAngle = 0.2;
+    camera.position.set(2.4, 22, 34);
+    camera.far = 280;
+    controls.target.set(1.2, 2.0, 8);
+    controls.minDistance = 7;
+    controls.maxDistance = 80;
+    controls.maxPolarAngle = 1.25;
+    controls.minPolarAngle = 0.35;
     controls.minAzimuthAngle = -Infinity;
     controls.maxAzimuthAngle = Infinity;
-    controls.autoRotate = !reduce;
+    controls.autoRotate = false;
   } else {
     camera.position.set(0.3, 8.6, 12.2);
     camera.far = 80;
@@ -632,7 +882,7 @@ function buildMode(profile) {
   }
   aimView(profile);
   canvas.setAttribute("aria-label", profile === "packhouse"
-    ? "Several farms around one packinghouse. Leaf, tomato, maize, and beans. Tractors and drip follow the day clock."
+    ? "Packhouse feeder. Three phases leave the pole. Street-EMS is the box on the pole. Phase B faults on its incomer. The market cooler moves onto phase A."
     : "Cutaway clinic. Reception, waiting, lunch, store, and the cold room. People move during clinic hours. Click a cabinet.");
 }
 
@@ -723,6 +973,7 @@ function frame(now) {
   });
   var hour = window.HoldDay && window.HoldDay.hour ? window.HoldDay.hour() : null;
   paintBank(hour);
+  paintCircuit(hour, now);
   var awake = hour == null || (hour >= 8 && hour < 17);
   folk.forEach(function (f) {
     var show = f.kind === "staff" || awake || reduce;
@@ -797,7 +1048,7 @@ function sync(host, profile, rooms) {
   var noteEl = host.querySelector(".doll-note");
   if (noteEl) {
     noteEl.textContent = profile === "packhouse"
-      ? "Several farms. Drag to look. Work speeds up with the morning clock. Click a cold room."
+      ? "Street-EMS is the box on the pole. Phase B breaks on the incomer. Drag to look. Click a cold room."
       : "Cutaway clinic. Drag to look. People move 08:00–17:00. Click a cabinet.";
   }
   if (mode !== profile) {

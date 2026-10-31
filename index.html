@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · cold storage desk</title>
-<link rel="stylesheet" href="hold.css?v=30">
+<link rel="stylesheet" href="hold.css?v=33">
 <script type="importmap">
 {
   "imports": {
@@ -52,7 +52,10 @@
       <p class="call-src"></p>
     </aside>
     <div class="fit" id="fit">
-    <div id="plan" class="plan-host"></div>
+    <div class="stage-col" id="stage-col">
+      <section id="phase" class="phase-board" hidden aria-label="Three-phase supply"></section>
+      <div id="plan" class="plan-host"></div>
+    </div>
     <div class="scene-wrap" style="position:relative;background:#0c0e12">
       <div id="scene" aria-label="OpenStreetMap place"></div>
       <button type="button" class="text-btn scene-follow" id="scene-follow" hidden>Stop following</button>
@@ -116,15 +119,15 @@
 
 <footer>
   <p>Glenn · Bonheur · Ella · Ademola · Adam · Sam</p>
-  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · Brief 01, off-grid cold storage · <a href="board.html">Board</a> · <a href="schema.html">MQTT schema</a> · <a href="DISCLOSURE.md">Disclosure</a> · <a href="https://github.com/EarthAdam/cold-storage-ui-hack">Source</a></p>
+  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · packhouse cold rooms · <a href="board.html">Board</a> · <a href="schema.html">MQTT schema</a> · <a href="DISCLOSURE.md">Disclosure</a> · <a href="https://github.com/EarthAdam/cold-storage-ui-hack">Source</a></p>
 </footer>
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
 <script src="chain.js?v=11"></script>
-<script src="day.js?v=15"></script>
+<script src="day.js?v=16"></script>
 <script src="scene.js?v=17"></script>
 <script src="plan.js?v=12"></script>
-<script src="hold.js?v=22"></script>
-<script type="module" src="doll.js?v=8"></script>
+<script src="hold.js?v=25"></script>
+<script type="module" src="doll.js?v=11"></script>
 </body>
 </html>

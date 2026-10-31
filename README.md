@@ -2,7 +2,7 @@
 
 Global Energy Hackathon, 30 Oct – 1 Nov 2026. The team is Glenn, Bonheur, Ella, Ademola, Adam, and Sam.
 
-This repo is the open screen for that entry. The case is an off-grid clinic fridge that has to stay at 2–8 °C. The board keeps the sensors, the relay, and the setpoint. Hold is the part a person watches: temperature, the door, power, and one sentence when a cabinet needs someone. It listens. It does not command the box. A fish landing and a packhouse use the same screen, so the clinic desk is not a one-off page.
+This repo is the open screen for that entry. The case is a packhouse on a weak three-phase supply. Phase B drops. The market cooler is a single-phase circuit, so Street-EMS opens it off B and closes it onto phase A. Hold draws that move. It does not command the contactors. The clinic and the fish landing are still on the switch. They are not the opening view.
 
 ## Open
 
@@ -16,11 +16,11 @@ The header switch changes °C and °F on screen. Messages stay in Celsius (`temp
 
 ## Trades
 
+- **Packhouse** — the opening view. The farm scene shows the three-phase yard, the fault on phase B, and the Street-EMS box on the pole moving the market cooler onto phase A. The contactors are simulated.
 - **Clinic** — vaccines, oxytocin, insulin. Freeze is as bad as heat. Cutaway of the building.
 - **Landing** — ice, the day's catch, a blast freezer. Map of the creek.
-- **Packhouse** — greens, tomatoes, a cooler that loses power. View of the farms.
 
-A clock sits to the right of the scene. The day starts at 06:00, runs fast until 10:00, then slows. A battery charges while the sun is up and discharges after. The same level is on the clock. A warm or open clinic cabinet shows one sentence in the corner. Prices on the page are estimates, not quotes.
+A clock sits to the right of the scene. The day starts at 06:00, runs fast until 10:00, then slows. The phase fault waits for that slow stretch. Drag the hour hand to rewind into it. Phase B falls, Street-EMS opens the market cooler off B, then closes it onto A. A battery charges while the sun is up and discharges after. The same level is on the clock. A corner sentence names who should act. Prices on the page are estimates, not quotes.
 
 ## MQTT
 

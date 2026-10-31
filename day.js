@@ -65,6 +65,8 @@
   var metricPack = null;
   var handEl = null;
   var tipEl = null;
+  var handHit = null;
+  var tipHit = null;
   var timeEl = null;
   var readTemp = null;
   var readRest = null;
@@ -293,15 +295,19 @@
         '<g class="metrics"></g>' +
         '<line class="hand" data-hand="1" x1="' + CX + '" y1="' + CY + '" x2="' + noon[0].toFixed(1) + '" y2="' + noon[1].toFixed(1) + '"/>' +
         '<circle class="tip" data-tip="1" cx="' + noon[0].toFixed(1) + '" cy="' + noon[1].toFixed(1) + '" r="3.5"/>' +
+        '<line class="hand-hit" data-hand-hit="1" x1="' + CX + '" y1="' + CY + '" x2="' + noon[0].toFixed(1) + '" y2="' + noon[1].toFixed(1) + '"/>' +
+        '<circle class="tip-hit" data-tip-hit="1" cx="' + noon[0].toFixed(1) + '" cy="' + noon[1].toFixed(1) + '" r="16"/>' +
         '<circle class="hub" cx="' + CX + '" cy="' + CY + '" r="40"/>' +
         '<text class="clock" data-time="1" x="' + CX + '" y="' + (CY - 6) + '">00:00:00</text>' +
-        '<text class="clock-sub" x="' + CX + '" y="' + (CY + 10) + '">sim</text>' +
+        '<text class="clock-sub" x="' + CX + '" y="' + (CY + 10) + '">drag hand</text>' +
         '<text class="read" data-read="temp" x="' + CX + '" y="' + (CY + 24) + '"></text>' +
         '<text class="read rest" data-read="rest" x="' + CX + '" y="492"></text>' +
         '<text class="hover-id" x="0" y="0" visibility="hidden"></text>' +
       "</svg>";
     handEl = host.querySelector("[data-hand]");
     tipEl = host.querySelector("[data-tip]");
+    handHit = host.querySelector("[data-hand-hit]");
+    tipHit = host.querySelector("[data-tip-hit]");
     timeEl = host.querySelector("[data-time]");
     readTemp = host.querySelector("[data-read=temp]");
     readRest = host.querySelector("[data-read=rest]");
@@ -359,16 +365,91 @@
 
   var FAST_MS = 6000;
   var SLOW_MS = 12000;
-  var viewT0 = Date.now();
+  var anchorHour = 6;
+  var anchorMs = Date.now();
+  var scrub = null;
+
+  function normHour(h) {
+    return ((h % 24) + 24) % 24;
+  }
 
   function restart() {
-    viewT0 = Date.now();
+    anchorHour = 6;
+    anchorMs = Date.now();
+    scrub = null;
   }
 
   function simHour() {
-    var t = Date.now() - viewT0;
-    if (t < FAST_MS) return 6 + (t / FAST_MS) * 4;
-    return (10 + (t - FAST_MS) / SLOW_MS) % 24;
+    if (scrub != null) return normHour(scrub);
+    var h = normHour(anchorHour);
+    var left = Date.now() - anchorMs;
+    var passedFast = h >= 10;
+    var i;
+    for (i = 0; i < 6 && left > 0; i++) {
+      var fast = !passedFast && h >= 6 && h < 10;
+      var msH = fast ? FAST_MS / 4 : SLOW_MS;
+      var dest = fast ? 10 : (h < 6 ? 6 : 24);
+      var need = (dest - h) * msH;
+      if (need <= 0) {
+        h = dest % 24;
+        if (dest === 10) passedFast = true;
+        continue;
+      }
+      if (left < need) return h + left / msH;
+      left -= need;
+      h = dest % 24;
+      if (dest === 10) passedFast = true;
+    }
+    return normHour(h);
+  }
+
+  function hourFromEvent(ev) {
+    var svg = document.querySelector(".day-svg");
+    var p = svgPoint(svg, ev);
+    if (!p) return null;
+    var a = Math.atan2(p.x - CX, -(p.y - CY));
+    if (a < 0) a += Math.PI * 2;
+    return normHour(12 + (a / (Math.PI * 2)) * 24);
+  }
+
+  function bindHand() {
+    var face = document.getElementById("day-face");
+    if (!face || face.getAttribute("data-hand-drag")) return;
+    face.setAttribute("data-hand-drag", "1");
+    var dragging = false;
+    face.addEventListener("pointerdown", function (ev) {
+      var hit = ev.target.closest && ev.target.closest("[data-hand-hit], [data-tip-hit]");
+      if (!hit || !face.contains(hit)) return;
+      dragging = true;
+      scrub = hourFromEvent(ev);
+      if (face.setPointerCapture) face.setPointerCapture(ev.pointerId);
+      var svg = face.querySelector(".day-svg");
+      if (svg) svg.classList.add("is-drag");
+      ev.preventDefault();
+    });
+    face.addEventListener("pointermove", function (ev) {
+      if (!dragging) return;
+      var h = hourFromEvent(ev);
+      if (h == null) return;
+      scrub = h;
+      moveHand();
+      if (window.HoldRepaint) window.HoldRepaint();
+    });
+    function endDrag(ev) {
+      if (!dragging) return;
+      dragging = false;
+      var h = hourFromEvent(ev);
+      if (h == null) h = scrub == null ? anchorHour : scrub;
+      scrub = null;
+      anchorHour = h;
+      anchorMs = Date.now();
+      var svg = face.querySelector(".day-svg");
+      if (svg) svg.classList.remove("is-drag");
+      moveHand();
+      if (window.HoldRepaint) window.HoldRepaint();
+    }
+    face.addEventListener("pointerup", endDrag);
+    face.addEventListener("pointercancel", endDrag);
   }
 
   var ROOM_INK = {
@@ -542,6 +623,16 @@
       tipEl.setAttribute("cx", outer[0].toFixed(2));
       tipEl.setAttribute("cy", outer[1].toFixed(2));
     }
+    if (handHit) {
+      handHit.setAttribute("x1", inner[0].toFixed(2));
+      handHit.setAttribute("y1", inner[1].toFixed(2));
+      handHit.setAttribute("x2", outer[0].toFixed(2));
+      handHit.setAttribute("y2", outer[1].toFixed(2));
+    }
+    if (tipHit) {
+      tipHit.setAttribute("cx", outer[0].toFixed(2));
+      tipHit.setAttribute("cy", outer[1].toFixed(2));
+    }
     if (timeEl) timeEl.textContent = clock(h);
     readNow(h);
     rows.forEach(function (row) {
@@ -628,6 +719,7 @@
     }
     moveHand();
     bindHover();
+    bindHand();
   }
 
   window.HoldDay = { paint: paint, hour: simHour, restart: restart };

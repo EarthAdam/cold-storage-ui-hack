@@ -110,7 +110,7 @@ const PROFILES = {
   },
   packhouse: {
     label: "Packhouse",
-    blurb: "Each crop has a band. Dry air wilts leaf. Power loss stalls the market run.",
+    blurb: "Three-phase mains. Phase B drops. Street-EMS moves the market cooler onto phase A.",
     currency: "KES",
     lines: {
       ok: "In band. Leave the door shut between pallets.",
@@ -146,9 +146,9 @@ const PROFILES = {
         id: "out", name: "Market cooler", place: "Packhouse",
         stock: "market load", qty: 40, unit: "crates", unitValue: 1100,
         band: [4, 8], freeze: null, scale: [0, 18],
-        rh: 78, temp: 6.4, watts: 0, runW: 350, volts: 0,
-        script: "outage", autonomyMin: 240, autonomyLeft: 26, spoilMin: 90,
-        aside: "This load is the morning run."
+        rh: 78, temp: 6.4, watts: 120, runW: 350, volts: 230,
+        script: "outage", autonomyMin: 240, spoilMin: 90,
+        aside: "Single-phase circuit. Street-EMS can move it. Not one leg of a three-phase compressor."
       })
     ]
   }
@@ -204,7 +204,8 @@ function saveStore() {
     selected: state.selected,
     binds: binds,
     broker: broker,
-    unit: state.unit
+    unit: state.unit,
+    packLead: true
   }));
 }
 
@@ -385,6 +386,57 @@ function setSimPower(room, volts, watts) {
   if (room.powerExpected) room.hz = volts != null && volts > 40 ? 50 : 0;
 }
 
+function setFeed(room, volts, watts, phase) {
+  if (room.powerLive) return;
+  setSimPower(room, volts, watts);
+  const ph = [0, 0, 0];
+  const i = phase === "A" ? 0 : phase === "B" ? 1 : phase === "C" ? 2 : -1;
+  if (i >= 0) ph[i] = watts || 0;
+  room.phases = ph;
+  room.feed = phase || "open";
+}
+
+/* Illustrative packhouse day. The market cooler is one single-phase
+   circuit. Street-EMS opens it off the dead phase, then closes it
+   onto a live phase. The desk only draws this. It does not command it. */
+function packSupply(h) {
+  const x = ((h % 24) + 24) % 24;
+  const live = 230;
+  let step = "run";
+  let feed = "A";
+  let fault = true;
+  if (x < 10) { step = "hold"; feed = "B"; fault = false; }
+  else if (x < 10.6) { step = "fault"; feed = "B"; fault = true; }
+  else if (x < 11.2) { step = "break"; feed = "open"; fault = true; }
+  else if (x < 11.8) { step = "make"; feed = "A"; fault = true; }
+  else { step = "run"; feed = "A"; fault = true; }
+  return {
+    volts: [live, fault ? 18 : live, live],
+    feed: feed,
+    step: step,
+    fault: fault
+  };
+}
+
+function setPackCall(room, sup) {
+  if (room.callLive || room.id !== "out") return;
+  room.callMessage = "";
+  room.callWho = "";
+  if (sup.step === "fault") {
+    room.callWho = "Street-EMS";
+    room.callMessage = "Phase B is down. The market cooler is still tied to it.";
+  } else if (sup.step === "break") {
+    room.callWho = "Street-EMS";
+    room.callMessage = "Opened the cooler off phase B. Both contactors are open.";
+  } else if (sup.step === "make") {
+    room.callWho = "Street-EMS";
+    room.callMessage = "Closing the market cooler onto phase A.";
+  } else if (sup.step === "run" && sup.fault) {
+    room.callWho = "Street-EMS";
+    room.callMessage = "Market cooler is running on phase A. Phase B stays down.";
+  }
+}
+
 var CLINIC_DOORS = {
   front: [8.05, 8.70, 9.40, 10.15, 11.00, 11.80, 12.55, 13.40, 14.20, 15.00, 15.75, 16.45],
   vaccine: [8.35, 9.90, 11.40, 13.90, 15.40, 16.85],
@@ -420,6 +472,7 @@ function batteryAt(h) {
   return { soc: hi + (lo - hi) * smooth(at / span), flow: -1 };
 }
 window.HoldBattery = batteryAt;
+window.HoldSupply = packSupply;
 
 function onSpan(h, from, to) {
   const len = (to - from + 24) % 24;
@@ -533,31 +586,26 @@ function applyDay(room, prev, h, simMin) {
       room.temp = ease(room.temp, open ? base + 4.2 : base, step, open ? rise : fall);
       const wet = onSpan(h, 10, 16) ? 58 : (onSpan(h, 6, 10) ? 74 : 82);
       room.rh = ease(room.rh, wet, step, 40);
-      setSimPower(room, night ? 210 : 230, sun > 0.25 ? room.runW : Math.round(room.runW * 0.3));
+      setFeed(room, night ? 210 : 230, sun > 0.25 ? room.runW : Math.round(room.runW * 0.3), "A");
       room.autonomyLeft = room.autonomyMin;
     } else if (room.id === "tomato") {
       room.door = false;
       room.temp = 11.1 + sun * 1.5;
       room.rh = 90 - sun * 8;
-      setSimPower(room, night ? 210 : 231, sun > 0.25 ? room.runW : Math.round(room.runW * 0.22));
+      setFeed(room, night ? 210 : 231, sun > 0.25 ? room.runW : Math.round(room.runW * 0.22), "C");
       room.autonomyLeft = room.autonomyMin;
     } else {
-      const lost = onSpan(h, 12, 16);
+      const sup = packSupply(h);
       const truck = onSpan(h, 14, 18.5);
-      const f = spanFrac(h, 12, 16);
+      const dead = sup.feed === "open" || (sup.feed === "B" && sup.volts[1] < 40);
+      const watts = dead ? 0 : (truck ? room.runW : Math.round(room.runW * 0.35));
+      const vi = sup.feed === "A" ? 0 : sup.feed === "C" ? 2 : 1;
       room.door = truck;
-      var goal;
-      if (lost) {
-        setSimPower(room, 0, 0);
-        room.autonomyLeft = Math.max(0, room.autonomyMin * (1 - f));
-        goal = 6.2 + f * 6;
-      } else {
-        setSimPower(room, 230, truck ? room.runW : Math.round(room.runW * 0.3));
-        room.autonomyLeft = room.autonomyMin;
-        goal = truck ? 8.4 : 6.1;
-      }
-      room.temp = ease(room.temp, goal, step, truck || lost ? rise : fall);
+      setFeed(room, dead ? 0 : sup.volts[vi], watts, sup.feed);
+      room.autonomyLeft = dead ? Math.max(0, (room.autonomyLeft || room.autonomyMin) - step) : room.autonomyMin;
+      room.temp = ease(room.temp, dead ? 8.6 : (truck ? 8.2 : 6.2), step, dead || truck ? rise : fall);
       room.rh = 78;
+      setPackCall(room, sup);
     }
   }
 }
@@ -901,7 +949,8 @@ function fact(label, value) {
 
 function renderSwitch() {
   const host = document.getElementById("switch");
-  host.innerHTML = Object.keys(PROFILES).map(function (id) {
+  const order = ["packhouse", "clinic", "landing"];
+  host.innerHTML = order.filter(function (id) { return PROFILES[id]; }).map(function (id) {
     const on = id === state.profileId;
     return '<button type="button" data-profile="' + id + '" aria-pressed="' + on + '">' +
       esc(PROFILES[id].label) + '</button>';
@@ -1062,7 +1111,54 @@ function renderCall() {
   const real = room.callLive && room.deviceId && room.deviceId.indexOf("sim-") !== 0;
   el.querySelector(".call-src").textContent = real
     ? room.name + " · from the board"
-    : room.name + " · illustrative day · the phone would say this";
+    : room.callWho === "Street-EMS"
+      ? room.name + " · SIM · this page does not command the contactors"
+      : room.name + " · illustrative day · the phone would say this";
+}
+
+function renderPhase() {
+  const el = document.getElementById("phase");
+  if (!el) return;
+  const on = state.profileId === "packhouse";
+  el.hidden = !on;
+  if (!on) return;
+  const h = window.HoldDay ? HoldDay.hour() : 6;
+  const sup = packSupply(h);
+  const names = { A: "Leafy room", B: "", C: "Tomato room" };
+  if (sup.feed === "A") names.A = "Leafy room · market cooler";
+  else if (sup.feed === "B") names.B = "Market cooler";
+  else if (sup.feed === "C") names.C = "Tomato room · market cooler";
+  const copy = {
+    hold: "Market cooler is on phase B. All three phases are up.",
+    fault: "Phase B collapsed. The cooler is still tied to B and has no supply.",
+    break: "Street-EMS opened the cooler off B. Both contactors are open.",
+    make: "Street-EMS is closing the cooler onto phase A.",
+    run: "Cooler is running on phase A. Phase B is still down."
+  };
+  const legs = ["A", "B", "C"].map(function (ph, i) {
+    const dead = ph === "B" && sup.fault;
+    const carry = sup.feed === ph;
+    const cls = (dead ? " dead" : " live") + (carry ? " carry" : "");
+    return '<div class="ph-leg' + cls + '"><em>' + ph + '</em><strong>' +
+      Math.round(sup.volts[i]) + ' V</strong><span>' + esc(names[ph] || "—") + '</span></div>';
+  }).join("");
+  function sw(closed, hot) {
+    return '<i class="ph-sw' + (closed ? " closed" : " open") + (hot ? " hot" : "") + '" aria-hidden="true"></i>';
+  }
+  const bClosed = sup.step === "hold" || sup.step === "fault";
+  const aClosed = sup.step === "make" || sup.step === "run";
+  el.innerHTML =
+    '<div class="ph-top"><b>Street-EMS</b><span>SIM · single-phase cooler · break before make</span></div>' +
+    '<p class="ph-step">' + esc(copy[sup.step] || "") + '</p>' +
+    '<div class="ph-legs">' + legs + '</div>' +
+    '<div class="ph-xfer">' +
+      '<p class="ph-path">' + sw(bClosed, sup.fault) + '<span>Phase B contactor' +
+        (bClosed && sup.fault ? " · closed on a dead phase" : bClosed ? " · closed" : " · open") + '</span></p>' +
+      '<p class="ph-path">' + sw(aClosed, false) + '<span>Phase A contactor' +
+        (aClosed ? " · closed · cooler moved here" : " · open") + '</span></p>' +
+    '</div>' +
+    '<p class="ph-load">Market cooler · ' +
+      (sup.feed === "open" ? "off both phases" : "fed from phase " + sup.feed) + '</p>';
 }
 
 function renderChip() {
@@ -1106,19 +1202,19 @@ function placeStage(world) {
   stageWorld = world;
   var fit = document.getElementById("fit");
   var day = document.getElementById("day");
-  var plan = document.getElementById("plan");
+  var stage = document.getElementById("stage-col");
   var scene = document.querySelector(".scene-wrap");
   var detail = document.getElementById("detail");
   var body = document.getElementById("detail-body");
-  if (!fit || !day || !plan || !scene || !detail) return;
+  if (!fit || !day || !stage || !scene || !detail) return;
   if (world) {
-    fit.insertBefore(plan, day);
+    fit.insertBefore(stage, day);
     if (body) detail.insertBefore(scene, body);
     else detail.appendChild(scene);
   } else {
     fit.insertBefore(scene, day);
-    if (body) detail.insertBefore(plan, body);
-    else detail.appendChild(plan);
+    if (body) detail.insertBefore(stage, body);
+    else detail.appendChild(stage);
   }
   requestAnimationFrame(function () { window.dispatchEvent(new Event("resize")); });
 }
@@ -1142,6 +1238,7 @@ function render() {
   renderChip();
   renderCall();
   paintScene();
+  renderPhase();
   if (window.HoldDay) HoldDay.paint(state.profileId);
 }
 
@@ -1408,10 +1505,12 @@ function boot() {
     if (store.broker.pass) document.getElementById("broker-pass").value = store.broker.pass;
     if (store.broker.prefix) document.getElementById("broker-prefix").value = store.broker.prefix;
   }
-  state.profileId = PROFILES[store.profileId] ? store.profileId : "clinic";
+  const fresh = !store.packLead;
+  state.profileId = fresh ? "packhouse" : (PROFILES[store.profileId] ? store.profileId : "packhouse");
   state.unit = store.unit === "F" ? "F" : "C";
   state.rooms = buildRooms(state.profileId);
-  state.selected = state.rooms.some(function (r) { return r.id === store.selected; }) ? store.selected : state.rooms[0].id;
+  if (fresh) state.selected = "out";
+  else state.selected = state.rooms.some(function (r) { return r.id === store.selected; }) ? store.selected : (state.profileId === "packhouse" ? "out" : state.rooms[0].id);
   renderSwitch();
   if (window.HoldScene) {
     HoldScene.attach(
@@ -1456,7 +1555,7 @@ function boot() {
     simPrev = window.HoldDay ? HoldDay.hour() : 6;
     state.rooms = buildRooms(state.profileId);
     if (state.inbox[state.profileId]) applyGeoJSON(state.inbox[state.profileId]);
-    state.selected = state.rooms[0].id;
+    state.selected = state.profileId === "packhouse" ? "out" : state.rooms[0].id;
     renderSwitch();
     note(profile().label + " floor.");
     rememberLevel();
@@ -1529,7 +1628,8 @@ function boot() {
   setInterval(function () {
     const h = window.HoldDay ? window.HoldDay.hour() : 0;
     let d = h - simPrev;
-    if (d < 0) d += 24;
+    if (d < -12) d += 24;
+    if (d < 0) d = 0;
     const simMin = d * 60;
     state.rooms.forEach(function (room) { tickRoom(room, simPrev, h, simMin); });
     simPrev = h;
