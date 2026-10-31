@@ -432,6 +432,27 @@ function lidOpen(h, marks) {
   });
 }
 
+function setClinicCall(room, h, night) {
+  room.callMessage = "";
+  room.callWho = "";
+  if (room.id === "insulin") return;
+  const out = room.temp != null && (room.temp > room.band.max || room.temp < room.band.min);
+  if (night && out) {
+    room.callWho = "Nurse";
+    room.callMessage = "Move the vaccines now.";
+    return;
+  }
+  if (room.door) {
+    room.callWho = "Staff";
+    room.callMessage = room.id === "oxy" ? "Close the oxytocin lid." : "Close the vaccine lid.";
+    return;
+  }
+  if (out) {
+    room.callWho = "Technician";
+    room.callMessage = "Cabinet left the safe band. Check it in daylight.";
+  }
+}
+
 function applyDay(room, prev, h, simMin) {
   const step = simMin == null ? 1 : simMin;
   const sun = sun01(h);
@@ -457,6 +478,7 @@ function applyDay(room, prev, h, simMin) {
       setSimPower(room, night ? 208 : 230, open || sun > 0.45 ? room.runW : Math.round(room.runW * 0.12));
     }
     room.autonomyLeft = room.autonomyMin;
+    if (!room.callLive) setClinicCall(room, h, night);
     return;
   }
   if (id === "landing") {
@@ -575,6 +597,10 @@ window.HoldCurves = function () {
 function tickRoom(room, prev, h, simMin) {
   const live = room.envLive || room.powerLive;
   if (!live) applyDay(room, prev, h, simMin);
+  else if (state.profileId === "clinic" && !room.callLive) {
+    const realBoard = room.deviceId && room.deviceId.indexOf("sim-") !== 0;
+    if (!realBoard) setClinicCall(room, h, sun01(h) < 0.08);
+  }
   age(room, live ? 1 / 60 : simMin, live);
   pushSample(room);
 }
@@ -994,6 +1020,28 @@ function renderFeed() {
   }).join("");
 }
 
+function renderCall() {
+  const el = document.getElementById("call");
+  if (!el) return;
+  const rank = { Nurse: 0, Staff: 1, Technician: 2 };
+  const rooms = state.rooms.filter(function (room) { return room.callMessage; });
+  rooms.sort(function (a, b) {
+    return (rank[a.callWho] == null ? 9 : rank[a.callWho]) - (rank[b.callWho] == null ? 9 : rank[b.callWho]);
+  });
+  const room = rooms[0];
+  if (!room) {
+    el.hidden = true;
+    return;
+  }
+  el.hidden = false;
+  el.querySelector(".call-who").textContent = room.callWho || "Act";
+  el.querySelector(".call-msg").textContent = room.callMessage;
+  const real = room.callLive && room.deviceId && room.deviceId.indexOf("sim-") !== 0;
+  el.querySelector(".call-src").textContent = real
+    ? room.name + " · from the board"
+    : room.name + " · illustrative day · the phone would say this";
+}
+
 function renderChip() {
   const chip = document.getElementById("link-chip");
   const liveRooms = state.rooms.filter(function (r) { return r.envLive || r.powerLive; });
@@ -1069,6 +1117,7 @@ function render() {
   renderTimelines();
   renderFeed();
   renderChip();
+  renderCall();
   paintScene();
   if (window.HoldDay) HoldDay.paint(state.profileId);
 }
@@ -1087,7 +1136,22 @@ function findBound(deviceId) {
   return state.rooms.filter(function (r) { return r.deviceId === deviceId; })[0] || null;
 }
 
+function applyMaintenance(target, msg) {
+  if (!msg || !Object.prototype.hasOwnProperty.call(msg, "maintenance")) return;
+  const m = msg.maintenance;
+  if (m == null || m.message == null || String(m.message).trim() === "") {
+    target.callMessage = "";
+    target.callWho = "";
+    target.callLive = false;
+    return;
+  }
+  target.callMessage = String(m.message).slice(0, 180);
+  target.callWho = m.who ? String(m.who).slice(0, 40) : "";
+  target.callLive = true;
+}
+
 function applyEnv(target, msg) {
+  applyMaintenance(target, msg);
   const empty = Number(msg.temperature_C) === 0 && Number(msg.humidity_percent) === 0;
   target.lastSeen = Date.now();
   if (empty || msg.temperature_C == null) return;
@@ -1131,7 +1195,8 @@ function shadow() {
     temp: null, rh: null, door: false, watts: null, volts: null, phases: [0, 0, 0],
     probe: false, envLive: false, powerLive: false, place: "", lastSeen: 0,
     powerKnown: false, powerExpected: true, wh: 0, whBase: null,
-    band: { min: 0, max: 0 }, freeze: null, autonomyLeft: 0, rhBand: null, doorSince: 0, lastOpenMs: 0
+    band: { min: 0, max: 0 }, freeze: null, autonomyLeft: 0, rhBand: null, doorSince: 0, lastOpenMs: 0,
+    callMessage: "", callWho: "", callLive: false
   };
 }
 
@@ -1248,6 +1313,11 @@ function adopt(deviceId) {
     room.whBase = u.whBase;
   }
   if (u && u.place) room.place = u.place;
+  if (u && u.callLive) {
+    room.callMessage = u.callMessage;
+    room.callWho = u.callWho;
+    room.callLive = true;
+  }
   room.lastSeen = Date.now();
   state.unassigned.delete(deviceId);
   note(room.name + " bound to " + deviceId);

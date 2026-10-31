@@ -69,7 +69,11 @@ The desk does not publish to `…/cmd`. The simulator publishes only the GeoJSON
 
 ## License
 
-MIT. Copyright (c) 2026 Overview Solutions. See `LICENSE`.
+GNU Affero General Public License v3.0. Copyright (C) 2026 Overview Solutions. See `LICENSE`.
+
+This is the same license as the Circaevum graphics library. You may sell a copy. If you change this desk and serve that change over a network, you must offer the corresponding source. The public source for this tree is [github.com/EarthAdam/cold-storage-ui-hack](https://github.com/EarthAdam/cold-storage-ui-hack).
+
+Three.js, MapLibre GL, and MQTT.js stay under their own licenses. See `THIRD_PARTY_NOTICES.md`.
 
 ## Another trade
 

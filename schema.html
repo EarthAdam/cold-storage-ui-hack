@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · MQTT subtopics</title>
-<link rel="stylesheet" href="hold.css?v=27">
+<link rel="stylesheet" href="hold.css?v=28">
 <style>
   .spec { max-width: 78ch; margin: 0 auto; padding: 28px 22px 64px; }
   .spec h1 { font-family: var(--serif); font-weight: 560; font-size: 34px; margin: 0; }
@@ -29,7 +29,7 @@
 </head>
 <body>
 <article class="spec">
-  <p class="dim"><a href="index.html">Hold</a> · MQTT contract</p>
+  <p class="dim"><a href="index.html">Hold</a> · MQTT contract · <a href="https://github.com/EarthAdam/cold-storage-ui-hack">Source</a></p>
   <h1>Subtopic schema</h1>
   <p>MeshEMS publishes JSON. The desk only listens. Temperature on the wire is always Celsius. One board keeps the relay and the setpoint. Nothing in this page is a command.</p>
   <p>The same two payloads cover a clinic cabinet, a fish hold, and a packhouse room. A site with several cold systems repeats the environment payload, once per system. Bands, stock, and money stay on the desk. They are not sensor fields.</p>
@@ -65,6 +65,7 @@ openami/geojson/&lt;profile&gt;</pre>
     <li><code>latitude_deg</code> and <code>longitude_deg</code> are on the environment object. The desk does not move a map pin from them. Position for a simulated feed is the GeoJSON point, <code>[longitude, latitude]</code>.</li>
     <li>One device id binds to one room. A second room needs its own environment publication. A real id that is already live is not overwritten by a <code>sim-</code> point.</li>
     <li>The desk does not publish <code>…/cmd</code>.</li>
+    <li><code>maintenance</code> is proposed. It is not a command. A present <code>message</code> is the sentence a person should act on. An empty message, or <code>null</code>, clears it. The desk does not invent this field onto a live board.</li>
   </ul>
 
   <h2>subpanel_ENV</h2>
@@ -83,6 +84,8 @@ openami/geojson/&lt;profile&gt;</pre>
       <tr><td><code>model_id</code>, <code>length</code></td><td>number</td><td>SunSpec header. Not read.</td></tr>
       <tr><td><code>timestamp_ms</code></td><td>number</td><td>Board uptime. Not a clock.</td></tr>
       <tr><td><code>last_modbus_update_ms</code>, <code>last_gpio_update_ms</code></td><td>number</td><td>Not read.</td></tr>
+      <tr><td><code>maintenance.message</code></td><td>string</td><td>Proposed. The sentence to act on. Empty or a null <code>maintenance</code> clears the panel.</td></tr>
+      <tr><td><code>maintenance.who</code></td><td>string</td><td>Proposed. Who should act. The clinic day uses Nurse, Staff, or Technician.</td></tr>
     </tbody>
   </table>
   <pre>{
@@ -95,8 +98,10 @@ openami/geojson/&lt;profile&gt;</pre>
   "humidity_percent": 48,
   "door_open": false,
   "door_open_duration_ms": 8400,
-  "timestamp_ms": 1200344
+  "timestamp_ms": 1200344,
+  "maintenance": { "message": "Move the vaccines now.", "who": "Nurse" }
 }</pre>
+  <p class="dim"><code>maintenance</code> is proposed. The firmware topic name is not confirmed. The desk reads it when it is present on this object. It does not publish it.</p>
 
   <h2>subpanel_3Ph</h2>
   <p><span class="tag">Live</span> Subpanel meter. One object for the supply this device is on. Omit this topic for a passive box.</p>

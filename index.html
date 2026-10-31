@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · cold storage desk</title>
-<link rel="stylesheet" href="hold.css?v=27">
+<link rel="stylesheet" href="hold.css?v=28">
 <script type="importmap">
 {
   "imports": {
@@ -45,6 +45,11 @@
     <ol class="feed" id="feed"></ol>
   </aside>
   <main class="detail" id="detail">
+    <aside id="call" class="call" hidden>
+      <p class="call-who"></p>
+      <p class="call-msg"></p>
+      <p class="call-src"></p>
+    </aside>
     <div class="fit" id="fit">
     <div id="plan" class="plan-host"></div>
     <div class="scene-wrap" style="position:relative;background:#0c0e12">
@@ -110,7 +115,7 @@
 
 <footer>
   <p>Glenn · Ademola · Bonheur · Sam · Ursy · Adam</p>
-  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · Brief 01, off-grid cold storage · <a href="schema.html">MQTT schema</a></p>
+  <p>Global Energy Hackathon · 30 Oct – 1 Nov 2026 · Brief 01, off-grid cold storage · <a href="schema.html">MQTT schema</a> · <a href="DISCLOSURE.md">Disclosure</a> · <a href="https://github.com/EarthAdam/cold-storage-ui-hack">Source</a></p>
 </footer>
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
@@ -118,7 +123,7 @@
 <script src="day.js?v=14"></script>
 <script src="scene.js?v=16"></script>
 <script src="plan.js?v=12"></script>
-<script src="hold.js?v=20"></script>
+<script src="hold.js?v=21"></script>
 <script type="module" src="doll.js?v=7"></script>
 </body>
 </html>
