@@ -276,24 +276,41 @@ body[data-trade="packhouse"] .phase-board:not([hidden]) {
   border: 1px solid #e6c56a;
   font-size: 14px;
 }
-.call {
+.notification-slot {
   grid-column: 1 / -1;
-  position: static;
-  z-index: 5;
+  position: relative;
+  block-size: 64px;
+  min-block-size: 64px;
+  min-inline-size: 0;
+  contain: size layout;
+  overflow: hidden;
+}
+.notification-empty {
+  margin: 0;
+  padding: 8px 12px;
+  color: var(--dim);
+  font-size: 12px;
+}
+.notification-slot:has(.call:not([hidden])) .notification-empty { visibility: hidden; }
+.call {
+  position: absolute;
+  inset: 0;
   display: grid;
-  grid-template-columns: auto minmax(0, 1fr);
+  grid-template-columns: minmax(0, 8rem) minmax(0, 1fr);
+  align-content: start;
   align-items: baseline;
   gap: 2px 12px;
-  width: min(280px, 30%);
-  max-height: 6.5rem;
-  overflow: hidden;
+  inline-size: 100%;
+  block-size: 100%;
+  min-inline-size: 0;
+  overflow: auto;
+  overscroll-behavior: contain;
   margin: 0;
   padding: 8px 12px;
   border-left: 3px solid var(--act);
   border-radius: 4px;
   background: #241d1a;
   color: #ffe8e2;
-  pointer-events: none;
 }
 .call[hidden] { display: none; }
 .call-who {
@@ -302,6 +319,7 @@ body[data-trade="packhouse"] .phase-board:not([hidden]) {
   font-size: 10px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
+  overflow-wrap: anywhere;
   color: #e7a090;
 }
 .call-msg {
@@ -869,6 +887,7 @@ body[data-trade="desk"] .day-svg .tip-hit { pointer-events: none; cursor: defaul
   .fit { flex-direction: column; }
   .top { grid-template-columns: 1fr; align-items: start; }
   .top-actions { align-items: flex-start; }
+  .notification-slot { block-size: 88px; min-block-size: 88px; }
   .call { grid-template-columns: minmax(0, 1fr); }
   .call-src { grid-column: 1; }
   .stage { grid-template-columns: 1fr; }

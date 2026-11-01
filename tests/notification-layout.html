@@ -1,0 +1,268 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Notification layout checks</title><style>body{font:15px system-ui;background:#101411;color:#e7eee8}iframe{display:block;border:1px solid #64748b;margin:1rem 0;height:600px}pre{white-space:pre-wrap}</style></head><body><h1>Notification layout stability</h1><p>Actual page markup and styles at desktop and mobile widths.</p><button id="run">Run layout checks</button><pre id="result">Waiting for page styles…</pre><iframe title="1100px viewport" width="1100" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;&lt;base href=&quot;http://127.0.0.1:18731/&quot;&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;title&gt;Hold · cold storage desk&lt;/title&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;hold.css?v=43&quot;&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;overnight.css?v=2&quot;&gt;
+
+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css&quot;&gt;
+&lt;/head&gt;
+&lt;body class=&quot;dashboard&quot;&gt;
+&lt;header class=&quot;top&quot;&gt;
+  &lt;div class=&quot;brand&quot;&gt;
+    &lt;p class=&quot;mark&quot;&gt;Hold&lt;/p&gt;
+    &lt;p class=&quot;blurb&quot; id=&quot;blurb&quot;&gt;&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;nav class=&quot;menu&quot; aria-label=&quot;Desk&quot;&gt;
+    &lt;div class=&quot;switch&quot; id=&quot;switch&quot; role=&quot;group&quot; aria-label=&quot;Trade&quot;&gt;&lt;/div&gt;
+    &lt;a class=&quot;text-btn&quot; href=&quot;board.html&quot;&gt;Board&lt;/a&gt;
+    &lt;a class=&quot;text-btn&quot; href=&quot;schema.html&quot;&gt;MQTT schema&lt;/a&gt;
+  &lt;/nav&gt;
+  &lt;div class=&quot;top-actions&quot;&gt;
+    &lt;div class=&quot;switch&quot; id=&quot;unit&quot; role=&quot;group&quot; aria-label=&quot;Temperature unit&quot;&gt;
+      &lt;button type=&quot;button&quot; data-unit=&quot;C&quot; aria-pressed=&quot;true&quot;&gt;°C&lt;/button&gt;
+      &lt;button type=&quot;button&quot; data-unit=&quot;F&quot; aria-pressed=&quot;false&quot;&gt;°F&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;link-chip&quot; id=&quot;link-chip&quot;&gt;Simulated floor&lt;/p&gt;
+    &lt;button type=&quot;button&quot; class=&quot;text-btn&quot; id=&quot;link-open&quot;&gt;Link a board&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;notification-slot&quot; aria-label=&quot;Notifications&quot;&gt;
+    &lt;p class=&quot;notification-empty&quot; aria-hidden=&quot;true&quot;&gt;No active notifications&lt;/p&gt;
+    &lt;aside id=&quot;call&quot; class=&quot;call&quot; role=&quot;status&quot; aria-live=&quot;polite&quot; hidden&gt;
+      &lt;p class=&quot;call-who&quot;&gt;&lt;/p&gt;
+      &lt;p class=&quot;call-msg&quot;&gt;&lt;/p&gt;
+      &lt;p class=&quot;call-src&quot;&gt;&lt;/p&gt;
+    &lt;/aside&gt;
+  &lt;/div&gt;
+&lt;/header&gt;
+
+&lt;p class=&quot;strip&quot; id=&quot;strip&quot;&gt;&lt;/p&gt;
+&lt;p class=&quot;honest&quot;&gt;Prices and loss clocks are operator estimates for the demo. They are not quotes, lab results, or a ministry figure.&lt;/p&gt;
+
+&lt;section id=&quot;pack-demo&quot; class=&quot;pack-demo&quot; hidden aria-label=&quot;Packhouse transfer demo&quot;&gt;
+  &lt;div class=&quot;pack-demo-top&quot;&gt;&lt;strong&gt;Market cooler transfer · SIM&lt;/strong&gt;
+    &lt;button type=&quot;button&quot; id=&quot;pack-replay&quot;&gt;Play full transfer · 30 s&lt;/button&gt;
+    &lt;button type=&quot;button&quot; id=&quot;pack-explore&quot; hidden&gt;Explore day&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;p id=&quot;pack-result&quot; aria-live=&quot;polite&quot;&gt;&lt;/p&gt;
+  &lt;ol id=&quot;pack-steps&quot; aria-label=&quot;Transfer progress&quot;&gt;&lt;/ol&gt;
+&lt;/section&gt;
+
+&lt;div class=&quot;stage&quot;&gt;
+  &lt;aside class=&quot;list&quot; aria-label=&quot;Rooms&quot;&gt;
+    &lt;div id=&quot;unassigned&quot;&gt;&lt;/div&gt;
+    &lt;div id=&quot;rooms&quot;&gt;&lt;/div&gt;
+    &lt;ol class=&quot;feed&quot; id=&quot;feed&quot;&gt;&lt;/ol&gt;
+  &lt;/aside&gt;
+  &lt;main class=&quot;detail&quot; id=&quot;detail&quot;&gt;
+    &lt;section id=&quot;overnight-display&quot; aria-label=&quot;Recorded overnight MQTT replay&quot;&gt;&lt;/section&gt;
+
+    &lt;div class=&quot;fit&quot; id=&quot;fit&quot;&gt;
+    &lt;div class=&quot;stage-col&quot; id=&quot;stage-col&quot;&gt;
+      &lt;section id=&quot;phase&quot; class=&quot;phase-board&quot; hidden aria-label=&quot;Three-phase supply&quot;&gt;&lt;/section&gt;
+      &lt;div id=&quot;plan&quot; class=&quot;plan-host&quot;&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;scene-wrap&quot; style=&quot;position:relative;background:#0c0e12&quot;&gt;
+      &lt;div id=&quot;scene&quot; aria-label=&quot;OpenStreetMap place&quot;&gt;&lt;/div&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn scene-follow&quot; id=&quot;scene-follow&quot; hidden&gt;Stop following&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn scene-wide&quot; id=&quot;scene-wide&quot;&gt;Wider map&lt;/button&gt;
+      &lt;p class=&quot;scene-meta&quot; id=&quot;scene-meta&quot;&gt;&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;section class=&quot;day-wrap&quot; id=&quot;day&quot; aria-label=&quot;Daily cycle&quot;&gt;
+      &lt;div class=&quot;day-face&quot; id=&quot;day-face&quot;&gt;&lt;/div&gt;
+      &lt;a class=&quot;circa-mark&quot; href=&quot;https://circaevum.com/&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot; title=&quot;Powered by Circaevum graphics library&quot;&gt;
+        &lt;svg viewBox=&quot;0 0 16 16&quot; width=&quot;14&quot; height=&quot;14&quot; aria-hidden=&quot;true&quot;&gt;
+          &lt;circle cx=&quot;8&quot; cy=&quot;8&quot; r=&quot;2.1&quot; fill=&quot;currentColor&quot;/&gt;
+          &lt;ellipse cx=&quot;8&quot; cy=&quot;8&quot; rx=&quot;6.3&quot; ry=&quot;2.35&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.15&quot;/&gt;
+          &lt;ellipse cx=&quot;8&quot; cy=&quot;8&quot; rx=&quot;6.3&quot; ry=&quot;2.35&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.15&quot; transform=&quot;rotate(60 8 8)&quot;/&gt;
+          &lt;ellipse cx=&quot;8&quot; cy=&quot;8&quot; rx=&quot;6.3&quot; ry=&quot;2.35&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.15&quot; transform=&quot;rotate(120 8 8)&quot;/&gt;
+        &lt;/svg&gt;
+        &lt;span class=&quot;circa-mark-txt&quot;&gt;&lt;b&gt;Circaevum&lt;/b&gt;&lt;span&gt;graphics library&lt;/span&gt;&lt;/span&gt;
+      &lt;/a&gt;
+    &lt;/section&gt;
+    &lt;/div&gt;
+    &lt;div id=&quot;detail-body&quot;&gt;&lt;/div&gt;
+    &lt;p class=&quot;tl-head&quot; id=&quot;tl-head&quot;&gt;&lt;/p&gt;
+    &lt;div id=&quot;timelines&quot; class=&quot;timelines&quot;&gt;&lt;/div&gt;
+    &lt;section id=&quot;mqtt-telemetry&quot; aria-label=&quot;Received MQTT data&quot;&gt;&lt;/section&gt;
+    &lt;details id=&quot;tech&quot;&gt;
+      &lt;summary&gt;Phases and last payload&lt;/summary&gt;
+      &lt;p class=&quot;phases&quot; id=&quot;phases&quot;&gt;&lt;/p&gt;
+      &lt;pre class=&quot;raw&quot; id=&quot;raw&quot;&gt;&lt;/pre&gt;
+    &lt;/details&gt;
+    &lt;form class=&quot;bind&quot; id=&quot;bind-form&quot;&gt;
+      &lt;label&gt;MeshEMS board on this room
+        &lt;input id=&quot;bind&quot; name=&quot;bind&quot; autocomplete=&quot;off&quot; spellcheck=&quot;false&quot; placeholder=&quot;StreetPoleEMS_…&quot;&gt;
+      &lt;/label&gt;
+      &lt;button type=&quot;submit&quot;&gt;Use this board&lt;/button&gt;
+    &lt;/form&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+
+&lt;dialog class=&quot;link&quot; id=&quot;link&quot;&gt;
+  &lt;form method=&quot;dialog&quot; id=&quot;link-form&quot;&gt;
+    &lt;h2&gt;MQTT link&lt;/h2&gt;
+    &lt;p class=&quot;hint&quot;&gt;The desk listens on &lt;code&gt;wss://public.cloud.shiftr.io&lt;/code&gt; for &lt;code&gt;openami/#&lt;/code&gt; &lt;code&gt;nesl_coldems/#&lt;/code&gt;, and the proposed &lt;code&gt;coldami/v1/#&lt;/code&gt; display contract. COLD-EMS mains are &lt;code&gt;nesl_coldems/&amp;lt;id&amp;gt;/COLDAMI/mains&lt;/code&gt;. The page does not publish.&lt;/p&gt;
+    &lt;label&gt;WebSocket URL
+      &lt;input name=&quot;url&quot; id=&quot;broker-url&quot; value=&quot;wss://public.cloud.shiftr.io&quot;&gt;
+    &lt;/label&gt;
+    &lt;label&gt;User
+      &lt;input name=&quot;user&quot; id=&quot;broker-user&quot; value=&quot;public&quot;&gt;
+    &lt;/label&gt;
+    &lt;label&gt;Password
+      &lt;input name=&quot;pass&quot; id=&quot;broker-pass&quot; type=&quot;password&quot; value=&quot;public&quot;&gt;
+    &lt;/label&gt;
+    &lt;label&gt;Topic prefix
+      &lt;input name=&quot;prefix&quot; id=&quot;broker-prefix&quot; value=&quot;openami&quot;&gt;
+    &lt;/label&gt;
+    &lt;p class=&quot;hint&quot; id=&quot;link-status&quot;&gt;&lt;/p&gt;
+    &lt;div class=&quot;row&quot;&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn&quot; id=&quot;link-close&quot;&gt;Close&lt;/button&gt;
+      &lt;button type=&quot;submit&quot; id=&quot;link-go&quot;&gt;Connect&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn&quot; id=&quot;link-stop&quot;&gt;Disconnect&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/form&gt;
+&lt;/dialog&gt;
+
+&lt;footer&gt;
+  &lt;p&gt;Glenn · Bonheur · Ella · Ademola · Adam · Sam&lt;/p&gt;
+  &lt;p&gt;Global Energy Hackathon · 30 Oct – 1 Nov 2026 · packhouse cold rooms · &lt;a href=&quot;board.html&quot;&gt;Board&lt;/a&gt; · &lt;a href=&quot;schema.html&quot;&gt;MQTT schema&lt;/a&gt; · &lt;a href=&quot;DISCLOSURE.md&quot;&gt;Disclosure&lt;/a&gt; · &lt;a href=&quot;https://github.com/EarthAdam/cold-storage-ui-hack&quot;&gt;Source&lt;/a&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;&lt;/html&gt;"></iframe><iframe title="390px viewport" width="390" srcdoc="&lt;!DOCTYPE html&gt;
+&lt;html lang=&quot;en&quot;&gt;
+&lt;head&gt;&lt;base href=&quot;http://127.0.0.1:18731/&quot;&gt;
+&lt;meta charset=&quot;utf-8&quot;&gt;
+&lt;meta name=&quot;viewport&quot; content=&quot;width=device-width, initial-scale=1&quot;&gt;
+&lt;title&gt;Hold · cold storage desk&lt;/title&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;hold.css?v=43&quot;&gt;
+&lt;link rel=&quot;stylesheet&quot; href=&quot;overnight.css?v=2&quot;&gt;
+
+&lt;link rel=&quot;stylesheet&quot; href=&quot;https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.css&quot;&gt;
+&lt;/head&gt;
+&lt;body class=&quot;dashboard&quot;&gt;
+&lt;header class=&quot;top&quot;&gt;
+  &lt;div class=&quot;brand&quot;&gt;
+    &lt;p class=&quot;mark&quot;&gt;Hold&lt;/p&gt;
+    &lt;p class=&quot;blurb&quot; id=&quot;blurb&quot;&gt;&lt;/p&gt;
+  &lt;/div&gt;
+  &lt;nav class=&quot;menu&quot; aria-label=&quot;Desk&quot;&gt;
+    &lt;div class=&quot;switch&quot; id=&quot;switch&quot; role=&quot;group&quot; aria-label=&quot;Trade&quot;&gt;&lt;/div&gt;
+    &lt;a class=&quot;text-btn&quot; href=&quot;board.html&quot;&gt;Board&lt;/a&gt;
+    &lt;a class=&quot;text-btn&quot; href=&quot;schema.html&quot;&gt;MQTT schema&lt;/a&gt;
+  &lt;/nav&gt;
+  &lt;div class=&quot;top-actions&quot;&gt;
+    &lt;div class=&quot;switch&quot; id=&quot;unit&quot; role=&quot;group&quot; aria-label=&quot;Temperature unit&quot;&gt;
+      &lt;button type=&quot;button&quot; data-unit=&quot;C&quot; aria-pressed=&quot;true&quot;&gt;°C&lt;/button&gt;
+      &lt;button type=&quot;button&quot; data-unit=&quot;F&quot; aria-pressed=&quot;false&quot;&gt;°F&lt;/button&gt;
+    &lt;/div&gt;
+    &lt;p class=&quot;link-chip&quot; id=&quot;link-chip&quot;&gt;Simulated floor&lt;/p&gt;
+    &lt;button type=&quot;button&quot; class=&quot;text-btn&quot; id=&quot;link-open&quot;&gt;Link a board&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;div class=&quot;notification-slot&quot; aria-label=&quot;Notifications&quot;&gt;
+    &lt;p class=&quot;notification-empty&quot; aria-hidden=&quot;true&quot;&gt;No active notifications&lt;/p&gt;
+    &lt;aside id=&quot;call&quot; class=&quot;call&quot; role=&quot;status&quot; aria-live=&quot;polite&quot; hidden&gt;
+      &lt;p class=&quot;call-who&quot;&gt;&lt;/p&gt;
+      &lt;p class=&quot;call-msg&quot;&gt;&lt;/p&gt;
+      &lt;p class=&quot;call-src&quot;&gt;&lt;/p&gt;
+    &lt;/aside&gt;
+  &lt;/div&gt;
+&lt;/header&gt;
+
+&lt;p class=&quot;strip&quot; id=&quot;strip&quot;&gt;&lt;/p&gt;
+&lt;p class=&quot;honest&quot;&gt;Prices and loss clocks are operator estimates for the demo. They are not quotes, lab results, or a ministry figure.&lt;/p&gt;
+
+&lt;section id=&quot;pack-demo&quot; class=&quot;pack-demo&quot; hidden aria-label=&quot;Packhouse transfer demo&quot;&gt;
+  &lt;div class=&quot;pack-demo-top&quot;&gt;&lt;strong&gt;Market cooler transfer · SIM&lt;/strong&gt;
+    &lt;button type=&quot;button&quot; id=&quot;pack-replay&quot;&gt;Play full transfer · 30 s&lt;/button&gt;
+    &lt;button type=&quot;button&quot; id=&quot;pack-explore&quot; hidden&gt;Explore day&lt;/button&gt;
+  &lt;/div&gt;
+  &lt;p id=&quot;pack-result&quot; aria-live=&quot;polite&quot;&gt;&lt;/p&gt;
+  &lt;ol id=&quot;pack-steps&quot; aria-label=&quot;Transfer progress&quot;&gt;&lt;/ol&gt;
+&lt;/section&gt;
+
+&lt;div class=&quot;stage&quot;&gt;
+  &lt;aside class=&quot;list&quot; aria-label=&quot;Rooms&quot;&gt;
+    &lt;div id=&quot;unassigned&quot;&gt;&lt;/div&gt;
+    &lt;div id=&quot;rooms&quot;&gt;&lt;/div&gt;
+    &lt;ol class=&quot;feed&quot; id=&quot;feed&quot;&gt;&lt;/ol&gt;
+  &lt;/aside&gt;
+  &lt;main class=&quot;detail&quot; id=&quot;detail&quot;&gt;
+    &lt;section id=&quot;overnight-display&quot; aria-label=&quot;Recorded overnight MQTT replay&quot;&gt;&lt;/section&gt;
+
+    &lt;div class=&quot;fit&quot; id=&quot;fit&quot;&gt;
+    &lt;div class=&quot;stage-col&quot; id=&quot;stage-col&quot;&gt;
+      &lt;section id=&quot;phase&quot; class=&quot;phase-board&quot; hidden aria-label=&quot;Three-phase supply&quot;&gt;&lt;/section&gt;
+      &lt;div id=&quot;plan&quot; class=&quot;plan-host&quot;&gt;&lt;/div&gt;
+    &lt;/div&gt;
+    &lt;div class=&quot;scene-wrap&quot; style=&quot;position:relative;background:#0c0e12&quot;&gt;
+      &lt;div id=&quot;scene&quot; aria-label=&quot;OpenStreetMap place&quot;&gt;&lt;/div&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn scene-follow&quot; id=&quot;scene-follow&quot; hidden&gt;Stop following&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn scene-wide&quot; id=&quot;scene-wide&quot;&gt;Wider map&lt;/button&gt;
+      &lt;p class=&quot;scene-meta&quot; id=&quot;scene-meta&quot;&gt;&lt;/p&gt;
+    &lt;/div&gt;
+    &lt;section class=&quot;day-wrap&quot; id=&quot;day&quot; aria-label=&quot;Daily cycle&quot;&gt;
+      &lt;div class=&quot;day-face&quot; id=&quot;day-face&quot;&gt;&lt;/div&gt;
+      &lt;a class=&quot;circa-mark&quot; href=&quot;https://circaevum.com/&quot; target=&quot;_blank&quot; rel=&quot;noopener noreferrer&quot; title=&quot;Powered by Circaevum graphics library&quot;&gt;
+        &lt;svg viewBox=&quot;0 0 16 16&quot; width=&quot;14&quot; height=&quot;14&quot; aria-hidden=&quot;true&quot;&gt;
+          &lt;circle cx=&quot;8&quot; cy=&quot;8&quot; r=&quot;2.1&quot; fill=&quot;currentColor&quot;/&gt;
+          &lt;ellipse cx=&quot;8&quot; cy=&quot;8&quot; rx=&quot;6.3&quot; ry=&quot;2.35&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.15&quot;/&gt;
+          &lt;ellipse cx=&quot;8&quot; cy=&quot;8&quot; rx=&quot;6.3&quot; ry=&quot;2.35&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.15&quot; transform=&quot;rotate(60 8 8)&quot;/&gt;
+          &lt;ellipse cx=&quot;8&quot; cy=&quot;8&quot; rx=&quot;6.3&quot; ry=&quot;2.35&quot; fill=&quot;none&quot; stroke=&quot;currentColor&quot; stroke-width=&quot;1.15&quot; transform=&quot;rotate(120 8 8)&quot;/&gt;
+        &lt;/svg&gt;
+        &lt;span class=&quot;circa-mark-txt&quot;&gt;&lt;b&gt;Circaevum&lt;/b&gt;&lt;span&gt;graphics library&lt;/span&gt;&lt;/span&gt;
+      &lt;/a&gt;
+    &lt;/section&gt;
+    &lt;/div&gt;
+    &lt;div id=&quot;detail-body&quot;&gt;&lt;/div&gt;
+    &lt;p class=&quot;tl-head&quot; id=&quot;tl-head&quot;&gt;&lt;/p&gt;
+    &lt;div id=&quot;timelines&quot; class=&quot;timelines&quot;&gt;&lt;/div&gt;
+    &lt;section id=&quot;mqtt-telemetry&quot; aria-label=&quot;Received MQTT data&quot;&gt;&lt;/section&gt;
+    &lt;details id=&quot;tech&quot;&gt;
+      &lt;summary&gt;Phases and last payload&lt;/summary&gt;
+      &lt;p class=&quot;phases&quot; id=&quot;phases&quot;&gt;&lt;/p&gt;
+      &lt;pre class=&quot;raw&quot; id=&quot;raw&quot;&gt;&lt;/pre&gt;
+    &lt;/details&gt;
+    &lt;form class=&quot;bind&quot; id=&quot;bind-form&quot;&gt;
+      &lt;label&gt;MeshEMS board on this room
+        &lt;input id=&quot;bind&quot; name=&quot;bind&quot; autocomplete=&quot;off&quot; spellcheck=&quot;false&quot; placeholder=&quot;StreetPoleEMS_…&quot;&gt;
+      &lt;/label&gt;
+      &lt;button type=&quot;submit&quot;&gt;Use this board&lt;/button&gt;
+    &lt;/form&gt;
+  &lt;/main&gt;
+&lt;/div&gt;
+
+&lt;dialog class=&quot;link&quot; id=&quot;link&quot;&gt;
+  &lt;form method=&quot;dialog&quot; id=&quot;link-form&quot;&gt;
+    &lt;h2&gt;MQTT link&lt;/h2&gt;
+    &lt;p class=&quot;hint&quot;&gt;The desk listens on &lt;code&gt;wss://public.cloud.shiftr.io&lt;/code&gt; for &lt;code&gt;openami/#&lt;/code&gt; &lt;code&gt;nesl_coldems/#&lt;/code&gt;, and the proposed &lt;code&gt;coldami/v1/#&lt;/code&gt; display contract. COLD-EMS mains are &lt;code&gt;nesl_coldems/&amp;lt;id&amp;gt;/COLDAMI/mains&lt;/code&gt;. The page does not publish.&lt;/p&gt;
+    &lt;label&gt;WebSocket URL
+      &lt;input name=&quot;url&quot; id=&quot;broker-url&quot; value=&quot;wss://public.cloud.shiftr.io&quot;&gt;
+    &lt;/label&gt;
+    &lt;label&gt;User
+      &lt;input name=&quot;user&quot; id=&quot;broker-user&quot; value=&quot;public&quot;&gt;
+    &lt;/label&gt;
+    &lt;label&gt;Password
+      &lt;input name=&quot;pass&quot; id=&quot;broker-pass&quot; type=&quot;password&quot; value=&quot;public&quot;&gt;
+    &lt;/label&gt;
+    &lt;label&gt;Topic prefix
+      &lt;input name=&quot;prefix&quot; id=&quot;broker-prefix&quot; value=&quot;openami&quot;&gt;
+    &lt;/label&gt;
+    &lt;p class=&quot;hint&quot; id=&quot;link-status&quot;&gt;&lt;/p&gt;
+    &lt;div class=&quot;row&quot;&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn&quot; id=&quot;link-close&quot;&gt;Close&lt;/button&gt;
+      &lt;button type=&quot;submit&quot; id=&quot;link-go&quot;&gt;Connect&lt;/button&gt;
+      &lt;button type=&quot;button&quot; class=&quot;text-btn&quot; id=&quot;link-stop&quot;&gt;Disconnect&lt;/button&gt;
+    &lt;/div&gt;
+  &lt;/form&gt;
+&lt;/dialog&gt;
+
+&lt;footer&gt;
+  &lt;p&gt;Glenn · Bonheur · Ella · Ademola · Adam · Sam&lt;/p&gt;
+  &lt;p&gt;Global Energy Hackathon · 30 Oct – 1 Nov 2026 · packhouse cold rooms · &lt;a href=&quot;board.html&quot;&gt;Board&lt;/a&gt; · &lt;a href=&quot;schema.html&quot;&gt;MQTT schema&lt;/a&gt; · &lt;a href=&quot;DISCLOSURE.md&quot;&gt;Disclosure&lt;/a&gt; · &lt;a href=&quot;https://github.com/EarthAdam/cold-storage-ui-hack&quot;&gt;Source&lt;/a&gt;&lt;/p&gt;
+&lt;/footer&gt;
+&lt;/body&gt;&lt;/html&gt;"></iframe><script>
+function check(){let lines=[],failed=false;for(const f of document.querySelectorAll('iframe')){const d=f.contentDocument,c=d.getElementById('call');const elements=['.top','.notification-slot','.stage','#fit','#day'];const bounds=()=>elements.map(s=>{const r=d.querySelector(s).getBoundingClientRect();return [r.x,r.y,r.width,r.height]});c.hidden=true;const initial=bounds();for(const [name,text,hidden]of [['short','Phase B lost.',false],['long','An extended technician notification. '.repeat(40),false],['short again','Cooling restored.',false],['hidden','',true]]){c.querySelector('.call-who').textContent='COLD-EMS';c.querySelector('.call-msg').textContent=text;c.querySelector('.call-src').textContent='Market cooler · SIM · monitor only';c.hidden=hidden;const after=bounds(),pass=JSON.stringify(initial)===JSON.stringify(after);lines.push((pass?'PASS':'FAIL')+' '+f.width+'px / '+name+' / header '+after[0][3]+'px / stage y='+after[2][1]);if(!pass)failed=true;}}document.getElementById('result').textContent=(failed?'LAYOUT SHIFT DETECTED':'ALL NOTIFICATION LAYOUT CHECKS PASSED')+'\n'+lines.join('\n');}
+document.getElementById('run').addEventListener('click',check);window.addEventListener('load',check);
+</script></body></html>

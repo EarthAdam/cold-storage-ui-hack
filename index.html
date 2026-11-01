@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · cold storage desk</title>
-<link rel="stylesheet" href="hold.css?v=42">
+<link rel="stylesheet" href="hold.css?v=43">
 <link rel="stylesheet" href="overnight.css?v=2">
 <script type="importmap">
 {
@@ -35,11 +35,14 @@
     <p class="link-chip" id="link-chip">Simulated floor</p>
     <button type="button" class="text-btn" id="link-open">Link a board</button>
   </div>
-  <aside id="call" class="call" role="status" aria-live="polite" hidden>
+  <div class="notification-slot" aria-label="Notifications">
+    <p class="notification-empty" aria-hidden="true">No active notifications</p>
+    <aside id="call" class="call" role="status" aria-live="polite" hidden>
       <p class="call-who"></p>
       <p class="call-msg"></p>
       <p class="call-src"></p>
     </aside>
+  </div>
 </header>
 
 <p class="strip" id="strip"></p>
