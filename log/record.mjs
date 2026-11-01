@@ -437,6 +437,23 @@ function selfCheck() {
   const filled = envLane.bins.reduce(function (sum, n) { return sum + n; }, 0);
   if (filled !== 2) throw new Error("coverage dropped rows");
   if (envLane.bins.filter(function (n) { return n > 0; }).length < 2) throw new Error("log bins collapsed");
+  const multi = openDb(":memory:");
+  const nodes = [
+    ["nesl_coldems/cold_one/COLDAMI/mains", "nesl_coldems/cold_one", 101],
+    ["nesl_coldems/cold_two/COLDAMI/mains", "nesl_coldems/cold_two", 202],
+    ["nesl_dtmems/cold_one/DTMAMI/mains", "nesl_dtmems/cold_one", 303]
+  ];
+  nodes.forEach(function (entry, i) {
+    accept(multi, entry[0], JSON.stringify({ phases: { A: { voltage_ln: entry[2] } } }), 5000 + i);
+  });
+  nodes.forEach(function (entry) {
+    const rows = ask(multi, { device: entry[1], kind: "mains" });
+    if (rows.length !== 1 || JSON.parse(rows[0].body).phases.A.voltage_ln !== entry[2]) {
+      throw new Error("multi-node recording mixed device identities");
+    }
+  });
+  if (!verify(multi).ok || verify(multi).n !== 3) throw new Error("three-node log did not verify");
+  multi.close();
   db.prepare("UPDATE msg SET body = ? WHERE id = 1").run("{\"temperature_C\":99}");
   const broken = verify(db);
   if (broken.ok) throw new Error("tamper should break the chain");
@@ -648,7 +665,7 @@ function loadStreams() {
     const list = JSON.parse(fs.readFileSync(file, "utf8"));
     if (Array.isArray(list) && list.length) return list.map(function (stream) {
       return stream.host === "public.cloud.shiftr.io"
-        ? { ...stream, topics: Array.from(new Set([...(stream.topics || []), "openami/#", "nesl_coldems/#", "coldami/v1/#"])) }
+        ? { ...stream, topics: Array.from(new Set([...(stream.topics || []), "openami/#", "nesl_coldems/#", "nesl_dtmems/#", "coldami/v1/#"])) }
         : stream;
     });
   }
@@ -658,7 +675,7 @@ function loadStreams() {
     port: Number(flag("--port") || 1883),
     user: flag("--user") || "public",
     pass: flag("--pass") || "public",
-    topics: Array.from(new Set([prefix + "/#", "nesl_coldems/#", "coldami/v1/#"]))
+    topics: Array.from(new Set([prefix + "/#", "nesl_coldems/#", "nesl_dtmems/#", "coldami/v1/#"]))
   }];
 }
 

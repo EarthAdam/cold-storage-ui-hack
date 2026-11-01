@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · cold storage desk</title>
-<link rel="stylesheet" href="hold.css?v=40">
+<link rel="stylesheet" href="hold.css?v=41">
 <script type="importmap">
 {
   "imports": {
@@ -34,11 +34,6 @@
     <p class="link-chip" id="link-chip">Simulated floor</p>
     <button type="button" class="text-btn" id="link-open">Link a board</button>
   </div>
-  <aside id="call" class="call" role="status" aria-live="polite" hidden>
-    <p class="call-who"></p>
-    <p class="call-msg"></p>
-    <p class="call-src"></p>
-  </aside>
 </header>
 
 <p class="strip" id="strip"></p>
@@ -60,6 +55,11 @@
     <ol class="feed" id="feed"></ol>
   </aside>
   <main class="detail" id="detail">
+    <aside id="call" class="call" role="status" aria-live="polite" hidden>
+      <p class="call-who"></p>
+      <p class="call-msg"></p>
+      <p class="call-src"></p>
+    </aside>
     <div class="fit" id="fit">
     <div class="stage-col" id="stage-col">
       <section id="phase" class="phase-board" hidden aria-label="Three-phase supply"></section>

@@ -96,3 +96,7 @@ Choose Packhouse, then **Play full transfer · 30 s**. The replay runs from heal
 Desk consumes `nesl_coldems/<device>/COLDAMI/coldstor` (`coldems.coldstor.v1`). Upper/lower storage and compressor/phase-contactor probes keep their separate identities in the summary, clock histories and probe table. Each table row shows temperature, humidity, source, validity, age and Modbus address. Mock samples are SIM and never become a measured room probe; invalid readings and readings older than 60 seconds are withheld from current values. Node health cards show reported rule-engine state, mains/leakage data ages, last action, active codes and neutral risk. The existing MQTT subscription already covers this new leaf.
 
 Run `node tests/coldstor.cjs` for the updated payload checks.
+
+### Multiple hardware nodes
+
+The recorder subscribes to `nesl_coldems/#` and `nesl_dtmems/#`. It captures all node IDs under both families concurrently, storing the namespace plus node ID as the device identity. Two COLD-EMS nodes and one DTM-EMS node can share the broker; each node within a family needs a unique ID. Restart an already-running recorder after changing its subscriptions. The Desk MQTT inventory also receives both families; its bench-node selector and cold-room charts currently select COLD-EMS devices.
