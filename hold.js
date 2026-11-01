@@ -215,6 +215,7 @@ const state = {
   mqttAuto: true,
   deskMains: [],
   deskLeak: [],
+  deskRoom: [],
   deskRev: 0
 };
 
@@ -1023,6 +1024,23 @@ function coordText(room) {
 }
 
 function renderStrip() {
+  if (state.profileId === "desk") {
+    const c = state.coldems;
+    const room = state.rooms.filter(function (r) { return r.id === "feeder"; })[0];
+    const bits = [];
+    bits.push(c && c.monitorOnly === false ? "control armed" : "monitor only");
+    if (c && c.mainsValid) {
+      bits.push("A " + Math.round(c.volts[0]) + " V");
+      bits.push("B " + Math.round(c.volts[1]) + " V");
+      bits.push("C " + Math.round(c.volts[2]) + " V");
+      bits.push(Math.round((c.watts[0] || 0) + (c.watts[1] || 0) + (c.watts[2] || 0)) + " W");
+    } else bits.push(c && c.link === "connected" ? "meter quiet" : "waiting for mains");
+    bits.push(c && c.leakageAlarm ? "leakage alarm" : "leakage quiet");
+    bits.push(room && room.envLive && room.temp != null ? toDisplay(room.temp).toFixed(1) + unitSuffix() : "no room probe");
+    document.getElementById("strip").textContent = bits.join("  ·  ");
+    document.getElementById("blurb").textContent = fill(profile().blurb, null);
+    return;
+  }
   let act = 0;
   let watch = 0;
   let risk = 0;
@@ -1627,6 +1645,15 @@ function rememberMains(ts, msg) {
   });
 }
 
+function rememberRoom(ts, msg) {
+  if (!msg) return;
+  const temp = finiteNum(msg.temperature_C);
+  const rh = finiteNum(msg.humidity_percent);
+  if (temp == null && rh == null) return;
+  if (temp === 0 && (rh == null || rh === 0)) return;
+  upsertPoint(state.deskRoom, { ts: ts, h: easternHour(ts), temp: temp, rh: rh });
+}
+
 function rememberLeak(ts, msg) {
   if (!msg || !msg.sensors) return;
   const s = msg.sensors;
@@ -1656,10 +1683,13 @@ function loadDeskLog() {
   }
   pull("mains", rememberMains);
   pull("leakage", rememberLeak);
+  ["probes", "probe", "sht", "env"].forEach(function (kind) {
+    pull(kind, rememberRoom);
+  });
 }
 
 window.HoldDeskSeries = function () {
-  return { mains: state.deskMains, leak: state.deskLeak, rev: state.deskRev };
+  return { mains: state.deskMains, leak: state.deskLeak, room: state.deskRoom, unit: state.unit, rev: state.deskRev };
 };
 
 function ingestCold(parts, raw) {
@@ -1677,7 +1707,8 @@ function ingestCold(parts, raw) {
   let msg;
   try { msg = JSON.parse(raw); }
   catch (e) { return; }
-  if (sub === "COLDAMI/mains" && msg.phases) {
+  const leaf = sub.split("/").pop().toLowerCase().replace(/-/g, "");
+  if (leaf === "mains" && msg.phases) {
     ["A", "B", "C"].forEach(function (ph, i) {
       const p = msg.phases[ph] || {};
       node.volts[i] = Number(p.voltage_ln) || 0;
@@ -1687,28 +1718,36 @@ function ingestCold(parts, raw) {
     node.mainsValid = node.volts.some(function (v) { return v > 40; });
     rememberMains(epochMs(msg), msg);
     applyColdRoom(node);
-  } else if (sub === "epem") {
+  } else if (leaf === "epem") {
     node.mdns = msg.mdns_name || node.mdns;
-  } else if (sub === "COLDAMI/leakage" && msg.sensors) {
+  } else if (leaf === "leakage" && msg.sensors) {
     ["A", "B", "C"].forEach(function (ph, i) {
       const s = msg.sensors[ph] || {};
       node.leak[i] = { alarm: !!s.alarm, ma: Number(s.leakage_ma) || 0 };
     });
     node.leakageAlarm = node.leak.some(function (s) { return s.alarm; });
     rememberLeak(epochMs(msg), msg);
-  } else if (sub === "COLDAMI/alerts") {
+  } else if (leaf === "alerts") {
     node.severity = msg.severity || "";
     node.activeCodes = msg.active_codes || "";
     if (msg.leakage_alarm_active) node.leakageAlarm = true;
     else if (msg.severity === "normal") node.leakageAlarm = false;
-  } else if (sub === "COLDAMI/automation") {
+  } else if (leaf === "automation") {
     node.lastAction = msg.last_action || "";
     node.monitorOnly = msg.monitor_only !== false;
   }
-  if (msg.temperature_C != null || msg.humidity_percent != null) {
+  const probe = (msg.temperature_C != null || msg.humidity_percent != null)
+    ? msg
+    : (Array.isArray(msg.probes) ? msg.probes.filter(function (p) {
+        return p && (p.temperature_C != null || p.humidity_percent != null);
+      })[0] : null);
+  if (probe) {
+    rememberRoom(epochMs(msg), probe);
     const room = coldTarget();
-    if (room) applyEnv(room, msg);
+    if (room) applyEnv(room, probe);
   }
+  const boardC = msg.dtm_temp != null ? msg.dtm_temp : (msg.coldems_temp != null ? msg.coldems_temp : msg["COLD-EMS_temp"]);
+  if (boardC != null && boardC !== "") node.boardC = Number(boardC);
   paintCallFromCold(node);
 }
 

@@ -359,12 +359,13 @@
     rows = [];
     if (key && id === "desk") {
       key.innerHTML = [
-        ["vA", "#e6c56a", "Phase A", "COLDAMI/mains · phases.A.voltage_ln"],
-        ["vB", "#7dcea0", "Phase B", "COLDAMI/mains · phases.B.voltage_ln"],
-        ["vC", "#3aa0d8", "Phase C", "COLDAMI/mains · phases.C.voltage_ln"],
-        ["mA", "#e08a62", "Leak A", "COLDAMI/leakage · sensors.A.leakage_ma"],
-        ["mB", "#c4a574", "Leak B", "COLDAMI/leakage · sensors.B.leakage_ma"],
-        ["mC", "#e7a090", "Leak C", "COLDAMI/leakage · sensors.C.leakage_ma"]
+        ["vA", "#e6c56a", "Phase A", "mains · phases.A.voltage_ln"],
+        ["vB", "#7dcea0", "Phase B", "mains · phases.B.voltage_ln"],
+        ["vC", "#3aa0d8", "Phase C", "mains · phases.C.voltage_ln"],
+        ["W", "#f4efe6", "Power", "mains · phases.A|B|C.real_power_w"],
+        ["mA", "#e08a62", "Leak A", "leakage · sensors.A.leakage_ma"],
+        ["mB", "#c4a574", "Leak B", "leakage · sensors.B.leakage_ma"],
+        ["mC", "#e7a090", "Leak C", "leakage · sensors.C.leakage_ma"]
       ].map(function (row) {
         return '<button type="button" class="day-row" data-trace="' + row[0] + '">' +
           '<i style="background:' + row[1] + '"></i>' +
@@ -585,13 +586,49 @@
     return best;
   }
 
-  function deskTrace(pts, pick, ext, id, color, leak) {
-    var d = poly(pts, pick, ext);
-    if (!d) return "";
-    return '<path class="hit" data-id="' + id + '" d="' + d + '"/>' +
-      '<path class="trace pick' + (leak ? " leak" : "") + '" data-id="' + id + '" data-trace="' + id + '" d="' + d +
-      '" stroke="' + color + '"><title>' + esc(id) + "</title></path>" +
-      '<circle class="now-dot" data-dot="' + id + '" r="2.6" fill="' + color + '"/>';
+  function deskT(v, ext) {
+    var t = 0;
+    if (ext && v != null && !isNaN(v) && ext[1] > ext[0]) {
+      t = (v - ext[0]) / (ext[1] - ext[0]);
+      if (t < 0) t = 0;
+      if (t > 1) t = 1;
+    }
+    return t;
+  }
+
+  function laneRadius(i, n, t) {
+    var span = (metricR1 - metricR0) / Math.max(1, n);
+    var inner = metricR0 + (n - 1 - i) * span;
+    var outer = inner + span - 3;
+    if (outer < inner) outer = inner;
+    return inner + t * (outer - inner);
+  }
+
+  function polyLane(pts, pick, ext, i, n) {
+    var d = "";
+    pts.forEach(function (p) {
+      var v = pick(p);
+      if (v == null || isNaN(v)) return;
+      var q = polar(p.h, laneRadius(i, n, deskT(v, ext)));
+      d += (d ? "L" : "M") + q[0].toFixed(1) + "," + q[1].toFixed(1);
+    });
+    return d;
+  }
+
+  function deskTrace(lane, n) {
+    var d = polyLane(lane.pts, lane.pick, lane.ext, lane.i, n);
+    var guide = laneRadius(lane.i, n, 0);
+    var nameAt = polar(15.2, laneRadius(lane.i, n, 0.35));
+    var html = '<circle class="lane-guide" cx="' + CX + '" cy="' + CY + '" r="' + guide.toFixed(1) +
+      '" fill="none" stroke="' + lane.color + '" stroke-width="1"/>';
+    html += '<text class="lane-label out" fill="' + lane.color + '" x="' + nameAt[0].toFixed(1) +
+      '" y="' + nameAt[1].toFixed(1) + '">' + esc(lane.name) + "</text>";
+    if (!d) return html;
+    html += '<path class="hit" data-id="' + lane.id + '" d="' + d + '"/>';
+    html += '<path class="trace pick' + (lane.leak ? " leak" : "") + '" data-id="' + lane.id + '" data-trace="' + lane.id +
+      '" d="' + d + '" stroke="' + lane.color + '"><title>' + esc(lane.id) + "</title></path>";
+    html += '<circle class="now-dot" data-dot="' + lane.id + '" r="2.6" fill="' + lane.color + '"/>';
+    return html;
   }
 
   function drawDeskMetrics() {
@@ -600,7 +637,8 @@
     var pack = window.HoldDeskSeries();
     var mains = pack.mains || [];
     var leak = pack.leak || [];
-    var key = "desk:" + pack.rev;
+    var room = pack.room || [];
+    var key = "desk:" + pack.rev + ":" + room.length;
     if (key === metricKey && g.childNodes.length) return;
     metricKey = key;
     var hi = 1;
@@ -609,43 +647,53 @@
         if (v != null && v > hi) hi = v;
       });
     });
-    pack.vExt = [0, 260];
-    pack.mExt = [0, hi * 1.15];
+    var lanes = [
+      { id: "vA", name: "A", color: "#e6c56a", ext: [0, 260], pts: mains, pick: function (p) { return p.vA; } },
+      { id: "vB", name: "B", color: "#7dcea0", ext: [0, 260], pts: mains, pick: function (p) { return p.vB; } },
+      { id: "vC", name: "C", color: "#3aa0d8", ext: [0, 260], pts: mains, pick: function (p) { return p.vC; } },
+      { id: "W", name: "W", color: "#f4efe6", ext: [0, 1500], pts: mains, pick: function (p) { return (p.wA || 0) + (p.wB || 0) + (p.wC || 0); } },
+      { id: "mA", name: "mA", color: "#e08a62", ext: [0, hi * 1.15], pts: leak, pick: function (p) { return p.mA; }, leak: true },
+      { id: "mB", name: "mB", color: "#c4a574", ext: [0, hi * 1.15], pts: leak, pick: function (p) { return p.mB; }, leak: true },
+      { id: "mC", name: "mC", color: "#e7a090", ext: [0, hi * 1.15], pts: leak, pick: function (p) { return p.mC; }, leak: true }
+    ];
+    if (room.length) {
+      lanes.push({ id: "temp", name: "°C", color: "#e08a62", ext: [-5, 30], pts: room, pick: function (p) { return p.temp; } });
+      lanes.push({ id: "rh", name: "RH", color: "#3aa0d8", ext: [0, 100], pts: room, pick: function (p) { return p.rh; } });
+    }
+    lanes.forEach(function (lane, i) { lane.i = i; });
+    pack.lanes = lanes;
+    pack.laneN = lanes.length;
     metricPack = pack;
-    g.innerHTML =
-      deskTrace(mains, function (p) { return p.vA; }, pack.vExt, "vA", "#e6c56a", false) +
-      deskTrace(mains, function (p) { return p.vB; }, pack.vExt, "vB", "#7dcea0", false) +
-      deskTrace(mains, function (p) { return p.vC; }, pack.vExt, "vC", "#3aa0d8", false) +
-      deskTrace(leak, function (p) { return p.mA; }, pack.mExt, "mA", "#e08a62", true) +
-      deskTrace(leak, function (p) { return p.mB; }, pack.mExt, "mB", "#c4a574", true) +
-      deskTrace(leak, function (p) { return p.mC; }, pack.mExt, "mC", "#e7a090", true);
+    g.innerHTML = lanes.map(function (lane) { return deskTrace(lane, lanes.length); }).join("");
   }
 
   function readDesk(h) {
     drawDeskMetrics();
-    if (!metricPack || !metricPack.mains) return;
-    var mains = metricPack.mains;
+    if (!metricPack || !metricPack.lanes) return;
+    var mains = metricPack.mains || [];
     var leak = metricPack.leak || [];
+    var room = metricPack.room || [];
     var m = mains.length ? mains[mains.length - 1] : null;
     var l = leak.length ? leak[leak.length - 1] : null;
+    var probe = room.length ? room[room.length - 1] : null;
     if (readTemp) {
-      readTemp.textContent = m
-        ? Math.round(m.vA) + " / " + Math.round(m.vB) + " / " + Math.round(m.vC) + " V"
-        : "no mains yet";
+      readTemp.textContent = probe && probe.temp != null
+        ? showTemp(probe.temp, metricPack.unit)
+        : (m ? Math.round(m.vA) + " / " + Math.round(m.vB) + " / " + Math.round(m.vC) + " V" : "no mains yet");
     }
     if (readRest) {
-      readRest.textContent = l
-        ? "leak " + l.mA + " / " + l.mB + " / " + l.mC + " mA"
-        : "no leakage yet";
+      var rest = l ? "leak " + l.mA + " / " + l.mB + " / " + l.mC + " mA" : "no leakage yet";
+      if (m) rest += " · " + Math.round((m.wA || 0) + (m.wB || 0) + (m.wC || 0)) + " W";
+      if (probe && probe.rh != null) rest += " · " + Math.round(probe.rh) + "%";
+      readRest.textContent = rest;
     }
-    if (!m) return;
-    placeDot("vA", h, rAt(m.vA, metricPack.vExt));
-    placeDot("vB", h, rAt(m.vB, metricPack.vExt));
-    placeDot("vC", h, rAt(m.vC, metricPack.vExt));
-    if (!l) return;
-    placeDot("mA", h, rAt(l.mA, metricPack.mExt));
-    placeDot("mB", h, rAt(l.mB, metricPack.mExt));
-    placeDot("mC", h, rAt(l.mC, metricPack.mExt));
+    metricPack.lanes.forEach(function (lane) {
+      if (!lane.pts.length) return;
+      var last = lane.pts[lane.pts.length - 1];
+      var v = lane.pick(last);
+      if (v == null || isNaN(v)) return;
+      placeDot(lane.id, h, laneRadius(lane.i, metricPack.laneN, deskT(v, lane.ext)));
+    });
   }
 
   function drawMetrics() {

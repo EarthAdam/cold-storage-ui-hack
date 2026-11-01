@@ -845,6 +845,8 @@ footer a { color: var(--safe); }
 .day-svg .trace { fill: none; stroke-width: 1.35; stroke-linejoin: round; stroke-linecap: round; }
 .day-svg .trace.pick { stroke-width: 2.2; }
 .day-svg .trace.rh, .day-svg .trace.power, .day-svg .trace.leak { stroke-dasharray: 5 3; }
+.day-svg .lane-guide { pointer-events: none; stroke-opacity: 0.35; }
+.day-svg .lane-label.out { text-anchor: start; }
 body[data-trade="desk"] .day-svg .hand-hit,
 body[data-trade="desk"] .day-svg .tip-hit { pointer-events: none; cursor: default; }
 .day-svg .trace.battery { stroke-width: 2.4; }

@@ -135,25 +135,72 @@ function num(v) {
   return typeof v === "number" && !Number.isNaN(v) ? v : null;
 }
 
+function blankFields() {
+  return {
+    temperature_C: null, humidity_percent: null, door_open: null, watts: null, volts: null,
+    v_a: null, v_b: null, v_c: null, w_a: null, w_b: null, w_c: null,
+    ma_a: null, ma_b: null, ma_c: null, hz: null, kwh: null, alarm: null
+  };
+}
+
+function sumNums(list) {
+  const known = list.filter(function (v) { return v != null; });
+  return known.length ? known.reduce(function (a, b) { return a + b; }, 0) : null;
+}
+
 function fields(kind, body) {
+  const out = blankFields();
   let msg = null;
   try { msg = JSON.parse(body); } catch (e) { msg = null; }
-  if (!msg || typeof msg !== "object") {
-    return { temperature_C: null, humidity_percent: null, door_open: null, watts: null, volts: null };
+  if (!msg || typeof msg !== "object") return out;
+  if (kind === "env" || num(msg.temperature_C) != null || num(msg.humidity_percent) != null) {
+    out.temperature_C = num(msg.temperature_C);
+    out.humidity_percent = num(msg.humidity_percent);
+    if (typeof msg.door_open === "boolean") out.door_open = msg.door_open ? 1 : 0;
   }
-  const temps = num(msg.temperature_C);
-  const rh = num(msg.humidity_percent);
-  const door = typeof msg.door_open === "boolean" ? (msg.door_open ? 1 : 0) : null;
-  const phases = [num(msg.WphA), num(msg.WphB), num(msg.WphC)];
-  const volts = [num(msg.PhVphA), num(msg.PhVphB), num(msg.PhVphC)].filter(function (v) { return v != null; });
-  const knownW = phases.filter(function (v) { return v != null; });
-  return {
-    temperature_C: kind === "env" ? temps : null,
-    humidity_percent: kind === "env" ? rh : null,
-    door_open: kind === "env" ? door : null,
-    watts: knownW.length ? knownW.reduce(function (a, b) { return a + b; }, 0) : null,
-    volts: volts.length ? Math.min.apply(null, volts) : null
-  };
+  const legacyW = [num(msg.WphA), num(msg.WphB), num(msg.WphC)];
+  const legacyV = [num(msg.PhVphA), num(msg.PhVphB), num(msg.PhVphC)].filter(function (v) { return v != null; });
+  if (legacyW.some(function (v) { return v != null; })) out.watts = sumNums(legacyW);
+  if (legacyV.length) out.volts = Math.min.apply(null, legacyV);
+  const ph = msg.phases;
+  if (ph && (ph.A || ph.B || ph.C)) {
+    out.v_a = num(ph.A && ph.A.voltage_ln);
+    out.v_b = num(ph.B && ph.B.voltage_ln);
+    out.v_c = num(ph.C && ph.C.voltage_ln);
+    out.w_a = num(ph.A && ph.A.real_power_w);
+    out.w_b = num(ph.B && ph.B.real_power_w);
+    out.w_c = num(ph.C && ph.C.real_power_w);
+    const vs = [out.v_a, out.v_b, out.v_c].filter(function (v) { return v != null; });
+    if (vs.length) out.volts = Math.min.apply(null, vs);
+    const watts = sumNums([out.w_a, out.w_b, out.w_c]);
+    if (watts != null) out.watts = watts;
+    out.hz = num(msg.totals && msg.totals.frequency_avg);
+    if (out.hz == null) out.hz = num(ph.A && ph.A.frequency);
+    out.kwh = sumNums([
+      num(ph.A && ph.A.energy_kwh),
+      num(ph.B && ph.B.energy_kwh),
+      num(ph.C && ph.C.energy_kwh)
+    ]);
+  }
+  const sensors = msg.sensors;
+  if (sensors && (sensors.A || sensors.B || sensors.C) &&
+      (sensors.A && (sensors.A.leakage_ma != null || sensors.A.alarm != null) ||
+       sensors.B && (sensors.B.leakage_ma != null || sensors.B.alarm != null) ||
+       sensors.C && (sensors.C.leakage_ma != null || sensors.C.alarm != null))) {
+    out.ma_a = num(sensors.A && sensors.A.leakage_ma);
+    out.ma_b = num(sensors.B && sensors.B.leakage_ma);
+    out.ma_c = num(sensors.C && sensors.C.leakage_ma);
+    out.alarm = [sensors.A, sensors.B, sensors.C].some(function (s) { return s && s.alarm; }) ? 1 : 0;
+  }
+  if (typeof msg.leakage_alarm_active === "boolean") out.alarm = msg.leakage_alarm_active ? 1 : 0;
+  if (Array.isArray(msg.probes)) {
+    const probe = msg.probes.filter(function (p) { return p && (num(p.temperature_C) != null || num(p.humidity_percent) != null); })[0];
+    if (probe) {
+      out.temperature_C = num(probe.temperature_C);
+      out.humidity_percent = num(probe.humidity_percent);
+    }
+  }
+  return out;
 }
 
 function rowHash(prev, ts, topic, body) {
@@ -182,6 +229,15 @@ export function openDb(file) {
   )`);
   db.exec("CREATE INDEX IF NOT EXISTS msg_device_ts ON msg(device, ts)");
   db.exec("CREATE INDEX IF NOT EXISTS msg_kind_ts ON msg(kind, ts)");
+  const have = db.prepare("PRAGMA table_info(msg)").all().map(function (col) { return col.name; });
+  [
+    ["v_a", "REAL"], ["v_b", "REAL"], ["v_c", "REAL"],
+    ["w_a", "REAL"], ["w_b", "REAL"], ["w_c", "REAL"],
+    ["ma_a", "REAL"], ["ma_b", "REAL"], ["ma_c", "REAL"],
+    ["hz", "REAL"], ["kwh", "REAL"], ["alarm", "INTEGER"]
+  ].forEach(function (col) {
+    if (have.indexOf(col[0]) < 0) db.exec("ALTER TABLE msg ADD COLUMN " + col[0] + " " + col[1]);
+  });
   return db;
 }
 
@@ -193,10 +249,13 @@ export function accept(db, topic, body, ts) {
   const hash = rowHash(prev, ts, topic, body);
   const f = fields(slot.kind, body);
   db.prepare(`INSERT INTO msg (
-    ts, topic, device, kind, temperature_C, humidity_percent, door_open, watts, volts, body, prev_hash, row_hash
-  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
+    ts, topic, device, kind, temperature_C, humidity_percent, door_open, watts, volts,
+    v_a, v_b, v_c, w_a, w_b, w_c, ma_a, ma_b, ma_c, hz, kwh, alarm,
+    body, prev_hash, row_hash
+  ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`).run(
     ts, topic, slot.device, slot.kind,
     f.temperature_C, f.humidity_percent, f.door_open, f.watts, f.volts,
+    f.v_a, f.v_b, f.v_c, f.w_a, f.w_b, f.w_c, f.ma_a, f.ma_b, f.ma_c, f.hz, f.kwh, f.alarm,
     body, prev, hash
   );
   return { device: slot.device, kind: slot.kind, hash: hash };
@@ -324,12 +383,26 @@ function selfCheck() {
   if (classify("openami/x/cmd").kind !== "cmd") throw new Error("cmd should be stored");
   const cold = classify("nesl_coldems/NESL_test/COLDAMI/mains");
   if (!cold || cold.kind !== "mains" || cold.device !== "nesl_coldems/NESL_test") throw new Error("coldems mains should be stored");
+  const renamed = classify("nesl_coldems/NESL_test/COLD-EMS/mains");
+  if (!renamed || renamed.kind !== "mains") throw new Error("COLD-EMS mains leaf should be stored");
   if (classify("$SYS/broker/version")) throw new Error("$SYS should be dropped");
   const db = openDb(file);
   accept(db, topic, body, 1000);
   accept(db, "openami/StreetPoleEMS_test/subpanel_3Ph", JSON.stringify({ WphA: 40, WphB: 10, PhVphA: 230, PhVphB: 228 }), 2000);
   const chain = verify(db);
   if (!chain.ok || chain.n !== 2) throw new Error("chain should hold 2 rows");
+  accept(db, "nesl_coldems/NESL_test/coldems/mains", JSON.stringify({
+    phases: {
+      A: { voltage_ln: 230, real_power_w: 40, energy_kwh: 1.5, frequency: 60 },
+      B: { voltage_ln: 12, real_power_w: 0, energy_kwh: 0 },
+      C: { voltage_ln: 228, real_power_w: 5, energy_kwh: 0.2 }
+    },
+    totals: { frequency_avg: 60 }
+  }), 3000);
+  const mains = db.prepare("SELECT v_a, v_b, v_c, watts, hz, kwh FROM msg WHERE kind = 'mains'").get();
+  if (!mains || mains.v_a !== 230 || mains.v_b !== 12 || mains.watts !== 45 || mains.hz !== 60) {
+    throw new Error("mains columns missed");
+  }
   const hot = ask(db, { device: "StreetPoleEMS_test", kind: "env", min_c: 5, max_c: 6 });
   if (hot.length !== 1) throw new Error("query missed the env row");
   accept(db, topic, body, Date.now() - 5000);
