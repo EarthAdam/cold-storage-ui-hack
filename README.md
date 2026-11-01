@@ -17,6 +17,7 @@ The header switch changes °C and °F on screen. Messages stay in Celsius (`temp
 ## Trades
 
 - **Packhouse** — the opening view. The farm scene shows the three-phase yard, the fault on phase B, and the Street-EMS box on the pole moving the market cooler onto phase A. The contactors are simulated.
+- **Desk** — the live COLD-EMS feeder. Phase volts, leakage, and the call come from `nesl_coldems`. A quiet meter stays unmarked. A dropped phase or a leakage alarm is the call. The page does not switch a contactor.
 - **Clinic** — vaccines, oxytocin, insulin. Freeze is as bad as heat. Cutaway of the building.
 - **Landing** — ice, the day's catch, a blast freezer. Map of the creek.
 

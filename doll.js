@@ -687,6 +687,26 @@ function paintList(list, hex, intensity) {
 }
 
 function paintLiveCircuit(live, now) {
+  if (!live || !live.mainsValid) {
+    [circuit.dropA, circuit.aBus, circuit.leafFeed, circuit.dropB, circuit.bIn, circuit.bBus, circuit.dropC, circuit.cBus, circuit.tomatoFeed, circuit.coolFromA, circuit.coolFromB].forEach(function (mesh) {
+      setGlow(mesh, 0x5c6560, 0.08);
+    });
+    paintList(circuit.lineA, 0x5c6560, 0.08);
+    paintList(circuit.lineB, 0x5c6560, 0.08);
+    paintList(circuit.lineC, 0x5c6560, 0.08);
+    circuit.jumper.visible = true;
+    circuit.faultOrb.visible = false;
+    circuit.faultLabel.sprite.visible = false;
+    circuit.emsMat.emissive.setHex(0x3d9a4a);
+    circuit.emsMat.emissiveIntensity = 0.15;
+    paintLabel(circuit.emsLabel, {
+      name: "COLD-EMS",
+      temp: live && live.link === "connected" ? "meter quiet" : "waiting",
+      sub: "box on the pole",
+      stock: "LIVE"
+    });
+    return;
+  }
   var down = [false, false, false];
   var i;
   for (i = 0; i < 3; i++) down[i] = live.volts[i] < 40;
@@ -727,7 +747,7 @@ function paintLiveCircuit(live, now) {
 function paintCircuit(hour, now) {
   if (!circuit) return;
   var live = window.HoldLive && window.HoldLive();
-  if (live && live.mainsValid) {
+  if ((window.HoldDesk && window.HoldDesk()) || (live && live.mainsValid)) {
     paintLiveCircuit(live, now);
     return;
   }
@@ -880,6 +900,13 @@ function buildFarm() {
   buildCircuit();
 }
 
+function buildDesk() {
+  scene.background = new THREE.Color(0x101410);
+  addLights(true);
+  scene.add(box(36, 0.08, 28, mat(0x1a221c, 0.9, 0), 2, -0.04, 12));
+  buildCircuit();
+}
+
 function aimView(profile) {
   if (profile === "packhouse") {
     camera.position.set(2.4, 22, 34);
@@ -887,6 +914,17 @@ function aimView(profile) {
     controls.target.set(1.2, 2.0, 8);
     controls.minDistance = 7;
     controls.maxDistance = 80;
+    controls.maxPolarAngle = 1.25;
+    controls.minPolarAngle = 0.35;
+    controls.minAzimuthAngle = -Infinity;
+    controls.maxAzimuthAngle = Infinity;
+    controls.autoRotate = false;
+  } else if (profile === "desk") {
+    camera.position.set(2.4, 18, 30);
+    camera.far = 220;
+    controls.target.set(1.2, 1.6, 11);
+    controls.minDistance = 6;
+    controls.maxDistance = 40;
     controls.maxPolarAngle = 1.25;
     controls.minPolarAngle = 0.35;
     controls.minAzimuthAngle = -Infinity;
@@ -911,6 +949,7 @@ function aimView(profile) {
 function buildMode(profile) {
   emptyScene();
   if (profile === "packhouse") buildFarm();
+  else if (profile === "desk") buildDesk();
   else {
     scene.background = new THREE.Color(0x1a1214);
     addLights(false);
@@ -924,7 +963,9 @@ function buildMode(profile) {
     buildWire();
   }
   aimView(profile);
-  canvas.setAttribute("aria-label", profile === "packhouse"
+  canvas.setAttribute("aria-label", profile === "desk"
+    ? "Live COLD-EMS feeder. Three phases, the pole box, and a phase fault when the node reports one."
+    : profile === "packhouse"
     ? "Packhouse feeder. Three phases leave the pole. Street-EMS is the box on the pole. Phase B faults on its incomer. The market cooler moves onto phase A."
     : "Cutaway clinic. Reception, waiting, lunch, store, and the cold room. People move during clinic hours. Click a cabinet.");
 }
@@ -1090,7 +1131,9 @@ function sync(host, profile, rooms) {
   }
   var noteEl = host.querySelector(".doll-note");
   if (noteEl) {
-    noteEl.textContent = profile === "packhouse"
+    noteEl.textContent = profile === "desk"
+      ? "Live feeder. The box is COLD-EMS. A dark phase is down. Drag to look."
+      : profile === "packhouse"
       ? "Street-EMS is the box on the pole. Phase B breaks on the incomer. Drag to look. Click a cold room."
       : "Cutaway clinic. Drag to look. People move 08:00–17:00. Click a cabinet.";
   }

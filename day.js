@@ -53,6 +53,15 @@
         { id: "heat", name: "Heat of day", color: "#e08a62", watch: true, label: "Full rooms through the hottest hours", spans: [{ from: 10, to: 16 }] },
         { id: "truck", name: "Truck", color: "#c4a574", label: "Out to the kitchens", spans: [{ from: 14, to: 18.5 }] }
       ]
+    },
+    desk: {
+      name: "COLD-EMS",
+      lat: 0,
+      lng: 0,
+      line: "Live feeder. The phases and the call come from the node.",
+      rings: [
+        { id: "live", name: "Live", color: "#7dcea0", label: "COLD-EMS is watching. It does not switch from this page.", spans: [{ from: 0, to: 12 }, { from: 12, to: 24 }] }
+      ]
     }
   };
 

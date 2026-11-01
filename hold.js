@@ -151,6 +151,36 @@ const PROFILES = {
         aside: "Single-phase circuit. Street-EMS can move it. Not one leg of a three-phase compressor."
       })
     ]
+  },
+  desk: {
+    label: "Desk",
+    blurb: "Live COLD-EMS feeder. Three phases, leakage, and the call. This page does not switch a contactor.",
+    currency: "USD",
+    lines: {
+      ok: "Phases are up. Leakage is quiet. The node is only watching.",
+      freeze: "Too cold.",
+      doorHot: "Door is open and the room is warm.",
+      outHot: "Power is gone and the room is warm.",
+      hot: "Above the band.",
+      cold: "Under the band.",
+      outageSoon: "A phase is down. The node raised a call. It has not moved the cooler.",
+      outage: "A phase is down. The node raised a call. It has not moved the cooler.",
+      dry: "Air is drier than this room wants.",
+      wet: "Air is wetter than this room wants.",
+      door: "Door is open.",
+      silent: "The node stopped reporting.",
+      noprobe: "No temperature on this node yet. The phases are the live feeder."
+    },
+    rooms: [
+      roomSpec({
+        id: "feeder", name: "Cold room", place: "COLD-EMS",
+        stock: "live feeder", qty: 0, unit: "reading", unitValue: 0,
+        band: [0, 30], freeze: null, scale: [-5, 40],
+        rh: null, temp: null, watts: 0, runW: 0, volts: null,
+        script: "hold", autonomyMin: 0, spoilMin: 0,
+        aside: "Single-phase cooler on a three-phase feeder. Humidity is a reading, not a control. A transfer is shown only if the node reports one."
+      })
+    ]
   }
 };
 
@@ -539,6 +569,7 @@ function applyDay(room, prev, h, simMin) {
   const id = state.profileId;
   const rise = 22;
   const fall = 48;
+  if (id === "desk") return;
   if (id === "clinic") {
     const marks = room.id === "vaccine" ? CLINIC_DOORS.vaccine : room.id === "oxy" ? CLINIC_DOORS.oxy : null;
     const open = marks ? lidOpen(h, marks) : false;
@@ -882,7 +913,7 @@ function dollRooms() {
 function paintPlan() {
   const host = document.getElementById("plan");
   if (!host || !window.HoldPlan) return;
-  const world = state.profileId === "clinic" || state.profileId === "packhouse";
+  const world = state.profileId === "clinic" || state.profileId === "packhouse" || state.profileId === "desk";
   if (world) {
     if (!window.HoldDoll) {
       if (host.getAttribute("data-profile") !== "world-wait") {
@@ -952,7 +983,7 @@ function fact(label, value) {
 
 function renderSwitch() {
   const host = document.getElementById("switch");
-  const order = ["packhouse", "clinic", "landing"];
+  const order = ["packhouse", "clinic", "landing", "desk"];
   host.innerHTML = order.filter(function (id) { return PROFILES[id]; }).map(function (id) {
     const on = id === state.profileId;
     return '<button type="button" data-profile="' + id + '" aria-pressed="' + on + '">' +
@@ -1041,6 +1072,10 @@ function renderRooms() {
 
 function renderDetail() {
   const room = selectedRoom();
+  if (state.profileId === "desk") {
+    renderDeskDetail(room);
+    return;
+  }
   const sit = judge(room);
   const doorMin = room.doorSince ? (Date.now() - room.doorSince) / 60000 : 0;
   let doorTxt = "Shut";
@@ -1097,6 +1132,35 @@ function renderDetail() {
   if (input && document.activeElement !== input) input.value = room.deviceId || "";
 }
 
+function renderDeskDetail(room) {
+  const c = state.coldems;
+  const temp = room.envLive && toDisplay(room.temp) != null ? toDisplay(room.temp).toFixed(1) + unitSuffix() : "no probe yet";
+  const rh = room.envLive && room.rh != null ? Math.round(room.rh) + "%" : "no probe yet";
+  const who = c && c.deviceId ? c.deviceId : "no node yet";
+  document.getElementById("detail-body").innerHTML =
+    '<p class="kicker live">LIVE</p>' +
+    '<h2>Cold room feeder</h2>' +
+    '<p class="place">' + esc(who) + (c && c.mdns ? " · " + esc(c.mdns) : "") + '</p>' +
+    '<p class="action">DTM-EMS at the mains decides. COLD-EMS at the room enforces. This desk only shows the call. It does not close a contactor.</p>' +
+    '<ul class="facts">' +
+      fact("Temperature", temp) +
+      fact("Humidity", rh) +
+      fact("Link", c && c.link ? c.link : "—") +
+      fact("Alert", c && c.severity ? c.severity : "—") +
+      fact("Leakage", c && c.leakageAlarm ? "alarm" : "quiet") +
+      fact("Mode", c && c.monitorOnly === false ? "control armed" : "monitor only") +
+    '</ul>' +
+    '<p class="aside">A dropped phase raises the call. Leakage blocks a move. A real break-before-make shows up here only after the node reports it.</p>';
+  const phases = document.getElementById("phases");
+  if (phases) {
+    phases.textContent = c && c.deviceId
+      ? "A " + Math.round(c.volts[0]) + " V · B " + Math.round(c.volts[1]) + " V · C " + Math.round(c.volts[2]) + " V"
+      : "No COLD-EMS mains yet.";
+  }
+  const raw = document.getElementById("raw");
+  if (raw) raw.textContent = state.lastRaw || "No MQTT payload yet.";
+}
+
 function renderFeed() {
   document.getElementById("feed").innerHTML = state.feed.map(function (item) {
     return "<li>" + esc(item.text) + "</li>";
@@ -1132,46 +1196,40 @@ function renderCall() {
 function renderPhase() {
   const el = document.getElementById("phase");
   if (!el) return;
-  const on = state.profileId === "packhouse";
+  const on = state.profileId === "desk";
   el.hidden = !on;
   if (!on) return;
-  const h = window.HoldDay ? HoldDay.hour() : 6;
-  const sup = packSupply(h);
-  const names = { A: "Leafy room", B: "", C: "Tomato room" };
-  if (sup.feed === "A") names.A = "Leafy room · market cooler";
-  else if (sup.feed === "B") names.B = "Market cooler";
-  else if (sup.feed === "C") names.C = "Tomato room · market cooler";
-  const copy = {
-    hold: "Market cooler is on phase B. All three phases are up.",
-    fault: "Phase B collapsed. The cooler is still tied to B and has no supply.",
-    break: "Street-EMS opened the cooler off B. Both contactors are open.",
-    make: "Street-EMS is closing the cooler onto phase A.",
-    run: "Cooler is running on phase A. Phase B is still down."
-  };
-  const legs = ["A", "B", "C"].map(function (ph, i) {
-    const dead = ph === "B" && sup.fault;
-    const carry = sup.feed === ph;
-    const cls = (dead ? " dead" : " live") + (carry ? " carry" : "");
-    return '<div class="ph-leg' + cls + '"><em>' + ph + '</em><strong>' +
-      Math.round(sup.volts[i]) + ' V</strong><span>' + esc(names[ph] || "—") + '</span></div>';
-  }).join("");
-  function sw(closed, hot) {
-    return '<i class="ph-sw' + (closed ? " closed" : " open") + (hot ? " hot" : "") + '" aria-hidden="true"></i>';
+  const c = state.coldems;
+  if (!c || !c.deviceId) {
+    el.innerHTML = '<div class="ph-top"><b>COLD-EMS</b><span>LIVE</span></div>' +
+      '<p class="ph-step">Waiting for nesl_coldems.</p>';
+    return;
   }
-  const bClosed = sup.step === "hold" || sup.step === "fault";
-  const aClosed = sup.step === "make" || sup.step === "run";
+  const down = c.mainsValid ? c.volts.map(function (v) { return v < 40; }) : [false, false, false];
+  const legs = ["A", "B", "C"].map(function (ph, i) {
+    const leak = (c.leak && c.leak[i]) || { alarm: false, ma: 0 };
+    const cls = !c.mainsValid ? " quiet" : (down[i] ? " dead" : " live");
+    const leakTxt = leak.alarm ? "leakage alarm" : "leakage quiet";
+    return '<div class="ph-leg' + cls + '"><em>' + ph + '</em><strong>' +
+      (c.mainsValid ? Math.round(c.volts[i]) + " V" : "—") + '</strong><span>' +
+      (c.mainsValid ? Math.round(c.watts[i]) + " W · " : "") + leakTxt + '</span></div>';
+  }).join("");
+  let step = "Node linked. Meter is quiet, so the phases stay unmarked.";
+  if (c.link === "lost") step = "Link lost. Last values stay on screen. Nothing is switched.";
+  else if (c.leakageAlarm) step = "Leakage alarm. Leave the cooler where it is. Transfer stays blocked.";
+  else if (c.mainsValid && down.some(Boolean) && down.filter(Boolean).length < 3) {
+    const who = ["A", "B", "C"].filter(function (ph, i) { return down[i]; }).join(" and ");
+    step = "Phase " + who + " is down. Call is up. The node has not moved the cooler.";
+  } else if (c.mainsValid) step = "Three phases are up. The node is watching. It is not switching.";
+  const act = c.monitorOnly ? "monitor only" : "control armed";
+  const last = c.lastAction ? " · last action " + c.lastAction.replace(/_/g, " ") : "";
   el.innerHTML =
-    '<div class="ph-top"><b>Street-EMS</b><span>SIM · single-phase cooler · break before make</span></div>' +
-    '<p class="ph-step">' + esc(copy[sup.step] || "") + '</p>' +
+    '<div class="ph-top"><b>COLD-EMS</b><span>LIVE · ' + esc(c.mdns || c.deviceId) + '</span></div>' +
+    '<p class="ph-step">' + esc(step) + '</p>' +
     '<div class="ph-legs">' + legs + '</div>' +
-    '<div class="ph-xfer">' +
-      '<p class="ph-path">' + sw(bClosed, sup.fault) + '<span>Phase B contactor' +
-        (bClosed && sup.fault ? " · closed on a dead phase" : bClosed ? " · closed" : " · open") + '</span></p>' +
-      '<p class="ph-path">' + sw(aClosed, false) + '<span>Phase A contactor' +
-        (aClosed ? " · closed · cooler moved here" : " · open") + '</span></p>' +
-    '</div>' +
-    '<p class="ph-load">Market cooler · ' +
-      (sup.feed === "open" ? "off both phases" : "fed from phase " + sup.feed) + '</p>';
+    '<p class="ph-load">' + esc(c.link || "no state") + " · " + esc(act + last) +
+      (c.severity ? " · alert " + esc(c.severity) : "") +
+      (c.hz ? " · " + c.hz.toFixed(1) + " Hz" : "") + '</p>';
 }
 
 function renderChip() {
@@ -1236,7 +1294,7 @@ function placeStage(world) {
 
 function render() {
   var detail = document.getElementById("detail");
-  var world = state.profileId === "clinic" || state.profileId === "packhouse";
+  var world = state.profileId === "clinic" || state.profileId === "packhouse" || state.profileId === "desk";
   if (detail) {
     detail.classList.toggle("in-clinic", state.profileId === "clinic");
     detail.classList.toggle("has-world", world);
@@ -1399,6 +1457,12 @@ function liveFeed() {
   return state.coldems;
 }
 window.HoldLive = liveFeed;
+window.HoldDesk = function () { return state.profileId === "desk"; };
+
+function coldTarget() {
+  const id = state.profileId === "desk" ? "feeder" : "out";
+  return state.rooms.filter(function (r) { return r.id === id; })[0] || null;
+}
 
 function ensureCold(id) {
   if (!state.coldems || state.coldems.deviceId !== id) {
@@ -1411,9 +1475,12 @@ function ensureCold(id) {
       hz: 0,
       mainsValid: false,
       leakageAlarm: false,
+      leak: [{ alarm: false, ma: 0 }, { alarm: false, ma: 0 }, { alarm: false, ma: 0 }],
       severity: "",
+      activeCodes: "",
       lastAction: "",
       monitorOnly: true,
+      mdns: "",
       seen: 0
     };
   }
@@ -1422,7 +1489,7 @@ function ensureCold(id) {
 }
 
 function applyColdRoom(node) {
-  const room = packRoom();
+  const room = coldTarget();
   if (!room || !node.mainsValid) return;
   room.deviceId = node.deviceId;
   room.phases = node.watts.slice();
@@ -1435,7 +1502,7 @@ function applyColdRoom(node) {
 }
 
 function paintCallFromCold(node) {
-  const room = packRoom();
+  const room = coldTarget();
   if (!room) return;
   if (node.leakageAlarm) {
     room.callWho = "COLD-EMS";
@@ -1489,12 +1556,17 @@ function ingestCold(parts, raw) {
     node.hz = Number(msg.totals && msg.totals.frequency_avg) || 0;
     node.mainsValid = node.volts.some(function (v) { return v > 40; });
     applyColdRoom(node);
+  } else if (sub === "epem") {
+    node.mdns = msg.mdns_name || node.mdns;
   } else if (sub === "COLDAMI/leakage" && msg.sensors) {
-    node.leakageAlarm = ["A", "B", "C"].some(function (ph) {
-      return msg.sensors[ph] && msg.sensors[ph].alarm;
+    ["A", "B", "C"].forEach(function (ph, i) {
+      const s = msg.sensors[ph] || {};
+      node.leak[i] = { alarm: !!s.alarm, ma: Number(s.leakage_ma) || 0 };
     });
+    node.leakageAlarm = node.leak.some(function (s) { return s.alarm; });
   } else if (sub === "COLDAMI/alerts") {
     node.severity = msg.severity || "";
+    node.activeCodes = msg.active_codes || "";
     if (msg.leakage_alarm_active) node.leakageAlarm = true;
     else if (msg.severity === "normal") node.leakageAlarm = false;
   } else if (sub === "COLDAMI/automation") {
@@ -1502,7 +1574,7 @@ function ingestCold(parts, raw) {
     node.monitorOnly = msg.monitor_only !== false;
   }
   if (msg.temperature_C != null || msg.humidity_percent != null) {
-    const room = packRoom();
+    const room = coldTarget();
     if (room) applyEnv(room, msg);
   }
   paintCallFromCold(node);
