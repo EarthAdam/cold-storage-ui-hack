@@ -322,6 +322,8 @@ function selfCheck() {
   const decoded = decodePublish(takePacket(packet));
   if (!decoded || decoded.topic !== topic || decoded.body !== body) throw new Error("publish decode failed");
   if (classify("openami/x/cmd").kind !== "cmd") throw new Error("cmd should be stored");
+  const cold = classify("nesl_coldems/NESL_test/COLDAMI/mains");
+  if (!cold || cold.kind !== "mains" || cold.device !== "nesl_coldems/NESL_test") throw new Error("coldems mains should be stored");
   if (classify("$SYS/broker/version")) throw new Error("$SYS should be dropped");
   const db = openDb(file);
   accept(db, topic, body, 1000);

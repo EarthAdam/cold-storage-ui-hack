@@ -95,7 +95,7 @@
 <dialog class="link" id="link">
   <form method="dialog" id="link-form">
     <h2>MQTT link</h2>
-    <p class="hint">The Nairobi board publishes on port 1883 to <code>public.cloud.shiftr.io</code>, topics <code>openami/&lt;id&gt;/subpanel_ENV</code> and <code>subpanel_3Ph</code>. Simulated trades publish GeoJSON to <code>openami/geojson/&lt;trade&gt;</code>. The desk uses the same broker over WebSocket.</p>
+    <p class="hint">The desk listens on <code>wss://public.cloud.shiftr.io</code> for <code>openami/#</code> and <code>nesl_coldems/#</code>. COLD-EMS mains are <code>nesl_coldems/&lt;id&gt;/COLDAMI/mains</code>. The page does not publish.</p>
     <label>WebSocket URL
       <input name="url" id="broker-url" value="wss://public.cloud.shiftr.io">
     </label>
@@ -127,7 +127,7 @@
 <script src="day.js?v=16"></script>
 <script src="scene.js?v=17"></script>
 <script src="plan.js?v=12"></script>
-<script src="hold.js?v=25"></script>
-<script type="module" src="doll.js?v=11"></script>
+<script src="hold.js?v=26"></script>
+<script type="module" src="doll.js?v=12"></script>
 </body>
 </html>

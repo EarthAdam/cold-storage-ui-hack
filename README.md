@@ -30,6 +30,9 @@ Broker `public.cloud.shiftr.io`, user `public`, password `public`.
 
 - `openami/<deviceId>/subpanel_ENV` — temperature, humidity, door
 - `openami/<deviceId>/subpanel_3Ph` — watts, volts, energy
+- `nesl_coldems/<deviceId>/COLDAMI/mains` — live three-phase volts from COLD-EMS. The desk also listens for `state`, `COLDAMI/leakage`, and `COLDAMI/alerts`. It does not command the node.
+
+The page connects to that broker on open. All-zero volts stay off the phase picture, so a quiet meter does not erase the simulated fault. A real phase drop does.
 
 A temperature and humidity of `0` / `0` means the probe is not live. The desk does not send commands.
 

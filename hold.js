@@ -180,7 +180,9 @@ const state = {
   inbox: {},
   inboxNoted: {},
   route: null,
-  unit: "C"
+  unit: "C",
+  coldems: null,
+  mqttAuto: true
 };
 
 function loadStore() {
@@ -205,7 +207,8 @@ function saveStore() {
     binds: binds,
     broker: broker,
     unit: state.unit,
-    packLead: true
+    packLead: true,
+    mqttAuto: state.mqttAuto !== false
   }));
 }
 
@@ -1076,7 +1079,15 @@ function renderDetail() {
 
   const phases = document.getElementById("phases");
   if (phases) {
-    phases.textContent = phaseTxt +
+    var liveLine = "";
+    if (state.coldems && state.coldems.deviceId) {
+      const c = state.coldems;
+      liveLine = "COLD-EMS " + c.link + " · A " + Math.round(c.volts[0]) + " V · B " +
+        Math.round(c.volts[1]) + " V · C " + Math.round(c.volts[2]) + " V";
+      if (!c.mainsValid) liveLine += " · meter quiet";
+      liveLine += " · ";
+    }
+    phases.textContent = liveLine + phaseTxt +
       (room.volts == null ? "" : " · " + Math.round(room.volts) + " V") +
       (room.hz ? " · " + room.hz.toFixed(1) + " Hz" : "");
   }
@@ -1113,7 +1124,9 @@ function renderCall() {
     ? room.name + " · from the board"
     : room.callWho === "Street-EMS"
       ? room.name + " · SIM · this page does not command the contactors"
-      : room.name + " · illustrative day · the phone would say this";
+      : room.callWho === "COLD-EMS"
+        ? room.name + " · LIVE · from the node · this page does not command it"
+        : room.name + " · illustrative day · the phone would say this";
 }
 
 function renderPhase() {
@@ -1168,6 +1181,8 @@ function renderChip() {
   const geo = liveRooms.some(function (r) { return r.deviceId && r.deviceId.indexOf("sim-") === 0; });
   if (board && (state.mqtt === "on" || liveRooms.length)) chip.textContent = "Board live";
   else if (geo) chip.textContent = "GeoJSON live";
+  else if (state.coldems && state.coldems.link === "connected") chip.textContent = state.coldems.mainsValid ? "COLD-EMS mains" : "COLD-EMS linked";
+  else if (state.coldems && state.coldems.link === "lost") chip.textContent = "COLD-EMS lost";
   else if (state.mqtt === "on") chip.textContent = "Broker connected";
   else if (state.mqtt === "try") chip.textContent = "Connecting";
   else chip.textContent = "Simulated floor";
@@ -1376,8 +1391,131 @@ function applyGeoJSON(msg) {
   });
 }
 
+function packRoom() {
+  return state.rooms.filter(function (r) { return r.id === "out"; })[0] || null;
+}
+
+function liveFeed() {
+  return state.coldems;
+}
+window.HoldLive = liveFeed;
+
+function ensureCold(id) {
+  if (!state.coldems || state.coldems.deviceId !== id) {
+    if (!state.coldems) note("COLD-EMS " + id + " is on the broker.");
+    state.coldems = {
+      deviceId: id,
+      link: "",
+      volts: [0, 0, 0],
+      watts: [0, 0, 0],
+      hz: 0,
+      mainsValid: false,
+      leakageAlarm: false,
+      severity: "",
+      lastAction: "",
+      monitorOnly: true,
+      seen: 0
+    };
+  }
+  state.coldems.seen = Date.now();
+  return state.coldems;
+}
+
+function applyColdRoom(node) {
+  const room = packRoom();
+  if (!room || !node.mainsValid) return;
+  room.deviceId = node.deviceId;
+  room.phases = node.watts.slice();
+  room.watts = node.watts[0] + node.watts[1] + node.watts[2];
+  room.volts = node.volts.filter(function (v) { return v > 40; })[0] || node.volts[0];
+  room.hz = node.hz;
+  room.powerKnown = true;
+  room.powerLive = true;
+  room.lastSeen = Date.now();
+}
+
+function paintCallFromCold(node) {
+  const room = packRoom();
+  if (!room) return;
+  if (node.leakageAlarm) {
+    room.callWho = "COLD-EMS";
+    room.callMessage = "Leakage alarm on the node. Leave the cooler where it is.";
+    room.callLive = true;
+    return;
+  }
+  if (node.mainsValid) {
+    const down = ["A", "B", "C"].filter(function (ph, i) { return node.volts[i] < 40; });
+    if (down.length && down.length < 3) {
+      room.callWho = "COLD-EMS";
+      room.callMessage = "Phase " + down.join(" and ") + " is down on " + node.deviceId + ".";
+      room.callLive = true;
+      return;
+    }
+  }
+  if (node.link === "lost") {
+    room.callWho = "COLD-EMS";
+    room.callMessage = "COLD-EMS link lost.";
+    room.callLive = true;
+    return;
+  }
+  if (room.callWho === "COLD-EMS") {
+    room.callMessage = "";
+    room.callWho = "";
+    room.callLive = false;
+  }
+}
+
+function ingestCold(parts, raw) {
+  const id = parts[1];
+  if (!id || id === "#") return;
+  const sub = parts.slice(2).join("/");
+  const node = ensureCold(id);
+  if (sub === "state") {
+    const next = String(raw || "").trim();
+    if (next !== node.link) note("COLD-EMS " + id + " " + (next || "state"));
+    node.link = next;
+    paintCallFromCold(node);
+    return;
+  }
+  let msg;
+  try { msg = JSON.parse(raw); }
+  catch (e) { return; }
+  if (sub === "COLDAMI/mains" && msg.phases) {
+    ["A", "B", "C"].forEach(function (ph, i) {
+      const p = msg.phases[ph] || {};
+      node.volts[i] = Number(p.voltage_ln) || 0;
+      node.watts[i] = Number(p.real_power_w) || 0;
+    });
+    node.hz = Number(msg.totals && msg.totals.frequency_avg) || 0;
+    node.mainsValid = node.volts.some(function (v) { return v > 40; });
+    applyColdRoom(node);
+  } else if (sub === "COLDAMI/leakage" && msg.sensors) {
+    node.leakageAlarm = ["A", "B", "C"].some(function (ph) {
+      return msg.sensors[ph] && msg.sensors[ph].alarm;
+    });
+  } else if (sub === "COLDAMI/alerts") {
+    node.severity = msg.severity || "";
+    if (msg.leakage_alarm_active) node.leakageAlarm = true;
+    else if (msg.severity === "normal") node.leakageAlarm = false;
+  } else if (sub === "COLDAMI/automation") {
+    node.lastAction = msg.last_action || "";
+    node.monitorOnly = msg.monitor_only !== false;
+  }
+  if (msg.temperature_C != null || msg.humidity_percent != null) {
+    const room = packRoom();
+    if (room) applyEnv(room, msg);
+  }
+  paintCallFromCold(node);
+}
+
 function ingest(topic, raw) {
-  state.lastRaw = topic + "\n" + raw;
+  state.lastRaw = topic + "\n" + String(raw).slice(0, 4000);
+  const parts = topic.split("/").filter(Boolean);
+  if (parts[0] === "nesl_coldems") {
+    ingestCold(parts, raw);
+    render();
+    return;
+  }
   let msg;
   try { msg = JSON.parse(raw); }
   catch (e) { note("Bad JSON on " + topic); return; }
@@ -1386,7 +1524,6 @@ function ingest(topic, raw) {
     render();
     return;
   }
-  const parts = topic.split("/").filter(Boolean);
   const at = parts.indexOf("openami");
   const base = at >= 0 ? at : 0;
   if (parts.length < base + 3) return;
@@ -1465,8 +1602,11 @@ function connectMqtt() {
   state.client = client;
   client.on("connect", function () {
     state.mqtt = "on";
-    client.subscribe(prefix.replace(/\/$/, "") + "/#");
-    document.getElementById("link-status").textContent = "Connected. Subscribed to " + prefix + "/#";
+    state.mqttAuto = true;
+    const topics = [prefix.replace(/\/$/, "") + "/#"];
+    if (topics.indexOf("nesl_coldems/#") < 0) topics.push("nesl_coldems/#");
+    topics.forEach(function (topic) { client.subscribe(topic); });
+    document.getElementById("link-status").textContent = "Connected. Subscribed to " + topics.join(" and ");
     note("Broker connected.");
     saveStore();
     render();
@@ -1492,6 +1632,8 @@ function disconnectMqtt(quiet) {
   }
   state.mqtt = "off";
   if (!quiet) {
+    state.mqttAuto = false;
+    saveStore();
     document.getElementById("link-status").textContent = "Disconnected. Rooms without a live board fall back to the simulated floor.";
     render();
   }
@@ -1508,6 +1650,7 @@ function boot() {
   const fresh = !store.packLead;
   state.profileId = fresh ? "packhouse" : (PROFILES[store.profileId] ? store.profileId : "packhouse");
   state.unit = store.unit === "F" ? "F" : "C";
+  state.mqttAuto = store.mqttAuto !== false;
   state.rooms = buildRooms(state.profileId);
   if (fresh) state.selected = "out";
   else state.selected = state.rooms.some(function (r) { return r.id === store.selected; }) ? store.selected : (state.profileId === "packhouse" ? "out" : state.rooms[0].id);
@@ -1555,6 +1698,7 @@ function boot() {
     simPrev = window.HoldDay ? HoldDay.hour() : 6;
     state.rooms = buildRooms(state.profileId);
     if (state.inbox[state.profileId]) applyGeoJSON(state.inbox[state.profileId]);
+    if (state.coldems) applyColdRoom(state.coldems);
     state.selected = state.profileId === "packhouse" ? "out" : state.rooms[0].id;
     renderSwitch();
     note(profile().label + " floor.");
@@ -1636,6 +1780,7 @@ function boot() {
     rememberLevel();
     render();
   }, 1000);
+  if (state.mqttAuto) connectMqtt();
 }
 
 window.HoldRepaint = render;

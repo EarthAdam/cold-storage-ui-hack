@@ -686,8 +686,51 @@ function paintList(list, hex, intensity) {
   for (i = 0; i < list.length; i++) setGlow(list[i], hex, intensity);
 }
 
+function paintLiveCircuit(live, now) {
+  var down = [false, false, false];
+  var i;
+  for (i = 0; i < 3; i++) down[i] = live.volts[i] < 40;
+  var faultB = down[1] && (!down[0] || !down[2]);
+  setGlow(circuit.dropA, down[0] ? 0xe24b4b : 0xe6c56a, down[0] ? 0.2 : 0.45);
+  setGlow(circuit.aBus, down[0] ? 0xe24b4b : 0xe6c56a, down[0] ? 0.2 : 0.45);
+  setGlow(circuit.leafFeed, down[0] ? 0xe24b4b : 0xe6c56a, down[0] ? 0.15 : 0.45);
+  paintList(circuit.lineA, down[0] ? 0xe24b4b : 0xe6c56a, down[0] ? 0.2 : 0.45);
+  setGlow(circuit.dropC, down[2] ? 0xe24b4b : 0x3aa0d8, down[2] ? 0.2 : 0.45);
+  setGlow(circuit.cBus, down[2] ? 0xe24b4b : 0x3aa0d8, down[2] ? 0.2 : 0.45);
+  setGlow(circuit.tomatoFeed, down[2] ? 0xe24b4b : 0x3aa0d8, down[2] ? 0.15 : 0.45);
+  paintList(circuit.lineC, down[2] ? 0xe24b4b : 0x3aa0d8, down[2] ? 0.2 : 0.45);
+  setGlow(circuit.dropB, down[1] ? 0xe24b4b : 0x7dcea0, down[1] ? 0.2 : 0.45);
+  setGlow(circuit.bIn, down[1] ? 0xe24b4b : 0x7dcea0, down[1] ? 0.85 : 0.45);
+  setGlow(circuit.bBus, down[1] ? 0x5c3030 : 0x7dcea0, down[1] ? 0.08 : 0.45);
+  paintList(circuit.lineB, down[1] ? 0xe24b4b : 0x7dcea0, down[1] ? 0.22 : 0.45);
+  circuit.jumper.visible = !faultB;
+  circuit.faultOrb.visible = faultB;
+  circuit.faultLabel.sprite.visible = faultB;
+  if (faultB && !reduce) {
+    var pulse = 0.4 + 0.6 * Math.sin(now / 180);
+    circuit.faultOrb.material.emissiveIntensity = pulse;
+    circuit.faultOrb.scale.setScalar(0.8 + 0.35 * pulse);
+  }
+  var names = ["A", "B", "C"].filter(function (ph, n) { return down[n]; });
+  var line = names.length ? names.join(" ") + " down" : "phases up";
+  if (live.leakageAlarm) line = "leakage alarm";
+  circuit.emsMat.emissive.setHex(names.length || live.leakageAlarm ? 0xe24b4b : 0x3d9a4a);
+  circuit.emsMat.emissiveIntensity = 0.7;
+  paintLabel(circuit.emsLabel, {
+    name: "Street-EMS",
+    temp: "LIVE " + line,
+    sub: "box on the pole",
+    stock: live.deviceId.slice(-6)
+  });
+}
+
 function paintCircuit(hour, now) {
   if (!circuit) return;
+  var live = window.HoldLive && window.HoldLive();
+  if (live && live.mainsValid) {
+    paintLiveCircuit(live, now);
+    return;
+  }
   var sup = window.HoldSupply && hour != null ? window.HoldSupply(hour) : { step: "hold", fault: false };
   var step = sup.step || "hold";
   var fault = !!sup.fault;
