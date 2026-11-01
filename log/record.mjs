@@ -179,6 +179,24 @@ function fields(kind, body) {
     if (watts != null) out.watts = watts;
     out.hz = num(msg.totals && msg.totals.frequency_avg);
     if (out.hz == null) out.hz = num(ph.A && ph.A.frequency);
+    const temps = ["A", "B", "C"].map(function (name) {
+      const leg = ph[name] || {};
+      return num(leg.temperature_c) != null ? num(leg.temperature_c) : num(leg.temperature_C);
+    });
+    const rhs = ["A", "B", "C"].map(function (name) {
+      const leg = ph[name] || {};
+      return num(leg.humidity_pct) != null ? num(leg.humidity_pct) : num(leg.humidity_percent);
+    });
+    let ci;
+    for (ci = 0; ci < 3; ci++) {
+      const t = temps[ci];
+      const h = rhs[ci];
+      if (t == null && h == null) continue;
+      if ((t == null || t === 0) && (h == null || h === 0)) continue;
+      if (t != null) out.temperature_C = t;
+      if (h != null) out.humidity_percent = h;
+      break;
+    }
     out.kwh = sumNums([
       num(ph.A && ph.A.energy_kwh),
       num(ph.B && ph.B.energy_kwh),
@@ -196,6 +214,11 @@ function fields(kind, body) {
     out.alarm = [sensors.A, sensors.B, sensors.C].some(function (s) { return s && s.alarm; }) ? 1 : 0;
   }
   if (typeof msg.leakage_alarm_active === "boolean") out.alarm = msg.leakage_alarm_active ? 1 : 0;
+  const upper = msg.sensors && msg.sensors.upper_storage_temp;
+  if (upper && (num(upper.temperature_c) != null || num(upper.humidity_pct) != null)) {
+    if (num(upper.temperature_c) != null) out.temperature_C = num(upper.temperature_c);
+    if (num(upper.humidity_pct) != null) out.humidity_percent = num(upper.humidity_pct);
+  }
   if (Array.isArray(msg.probes)) {
     const probe = msg.probes.filter(function (p) { return p && (num(p.temperature_C) != null || num(p.humidity_percent) != null); })[0];
     if (probe) {

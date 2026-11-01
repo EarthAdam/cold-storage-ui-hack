@@ -86,3 +86,13 @@ Checks:
 node tests/mqtt.cjs
 node log/record.mjs --check
 ```
+
+### Complete Packhouse transfer replay
+
+Choose Packhouse, then **Play full transfer · 30 s**. The replay runs from healthy B through phase loss, both contacts open, closure onto A, and cooling recovery. It holds at the result with volts, compressor watts and temperature in band. Phase B remains faulty: the successful outcome is continued cooling on A, not a repair to B. **Explore day** resumes the clock for the separate leakage scenario and other room alerts. All replay values and contactors are SIM; the live feed remains inspectable on Desk.
+
+### Updated COLDAMI cold-storage feed
+
+Desk consumes `nesl_coldems/<device>/COLDAMI/coldstor` (`coldems.coldstor.v1`). Upper/lower storage and compressor/phase-contactor probes keep their separate identities in the summary, clock histories and probe table. Each table row shows temperature, humidity, source, validity, age and Modbus address. Mock samples are SIM and never become a measured room probe; invalid readings and readings older than 60 seconds are withheld from current values. Node health cards show reported rule-engine state, mains/leakage data ages, last action, active codes and neutral risk. The existing MQTT subscription already covers this new leaf.
+
+Run `node tests/coldstor.cjs` for the updated payload checks.

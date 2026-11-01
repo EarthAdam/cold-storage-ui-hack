@@ -436,12 +436,14 @@
   var anchorHour = 6;
   var anchorMs = Date.now();
   var scrub = null;
+  var replay = null;
 
   function normHour(h) {
     return ((h % 24) + 24) % 24;
   }
 
   function restart() {
+    replay = null;
     anchorHour = 6;
     anchorMs = Date.now();
     scrub = null;
@@ -449,6 +451,10 @@
 
   function simHour() {
     if (window.HoldDesk && window.HoldDesk()) return easternHour(Date.now());
+    if (replay) {
+      var elapsed = Math.max(0, Date.now() - replay.started);
+      return replay.from + (replay.to - replay.from) * Math.min(1, elapsed / replay.duration);
+    }
     if (scrub != null) return normHour(scrub);
     var h = normHour(anchorHour);
     var left = Date.now() - anchorMs;
@@ -490,6 +496,7 @@
       if (window.HoldDesk && window.HoldDesk()) return;
       var hit = ev.target.closest && ev.target.closest("[data-hand-hit], [data-tip-hit]");
       if (!hit || !face.contains(hit)) return;
+      if (replay) return;
       dragging = true;
       scrub = hourFromEvent(ev);
       if (face.setPointerCapture) face.setPointerCapture(ev.pointerId);
@@ -639,7 +646,7 @@
     var mains = pack.mains || [];
     var leak = pack.leak || [];
     var room = pack.room || [];
-    var key = "desk:" + pack.rev + ":" + room.length;
+    var key = "desk:" + pack.rev + ":" + room.length + ":" + (pack.stor ? pack.stor.length : 0);
     if (key === metricKey && g.childNodes.length) return;
     metricKey = key;
     var hi = 1;
@@ -657,7 +664,41 @@
       { id: "mB", name: "mB", color: "#c4a574", ext: [0, hi * 1.15], pts: leak, pick: function (p) { return p.mB; }, leak: true },
       { id: "mC", name: "mC", color: "#e7a090", ext: [0, hi * 1.15], pts: leak, pick: function (p) { return p.mC; }, leak: true }
     ];
-    if (room.length) {
+    function climateOn(tKey, hKey) {
+      return mains.some(function (p) {
+        var t = p[tKey];
+        var h = p[hKey];
+        if (t == null && h == null) return false;
+        if ((t == null || t === 0) && (h == null || h === 0)) return false;
+        return true;
+      });
+    }
+    [["tA", "hA", "#e6c56a", "A"], ["tB", "hB", "#7dcea0", "B"], ["tC", "hC", "#3aa0d8", "C"]].forEach(function (spec) {
+      if (!climateOn(spec[0], spec[1])) return;
+      lanes.push({ id: spec[0], name: spec[3] + "°", color: spec[2], ext: [-2, 20], pts: mains, pick: function (p) { return p[spec[0]]; } });
+      lanes.push({ id: spec[1], name: spec[3] + "%", color: spec[2], ext: [0, 100], pts: mains, pick: function (p) { return p[spec[1]]; }, leak: true });
+    });
+    var stor = pack.stor || [];
+    function storOn(key, hKey) {
+      return stor.some(function (p) {
+        var t = p[key];
+        var h = p[hKey];
+        if (t == null && h == null) return false;
+        if ((t == null || t === 0) && (h == null || h === 0)) return false;
+        return true;
+      });
+    }
+    [
+      ["upper", "hUpper", "Up", "#7dcea0", [-2, 16]],
+      ["lower", "hLower", "Lo", "#3d9a4a", [-2, 16]],
+      ["comp", "hComp", "Cp", "#e6c56a", [0, 40]],
+      ["cont", "hCont", "Ct", "#e08a62", [0, 40]]
+    ].forEach(function (spec) {
+      if (!storOn(spec[0], spec[1])) return;
+      lanes.push({ id: spec[0], name: spec[2] + "°", color: spec[3], ext: spec[4], pts: stor, pick: function (p) { return p[spec[0]]; } });
+      lanes.push({ id: spec[1], name: spec[2] + "%", color: spec[3], ext: [0, 100], pts: stor, pick: function (p) { return p[spec[1]]; }, leak: true });
+    });
+    if (room.length && !lanes.some(function (lane) { return lane.id === "tA" || lane.id === "upper"; })) {
       lanes.push({ id: "temp", name: "°C", color: "#e08a62", ext: [-5, 30], pts: room, pick: function (p) { return p.temp; } });
       lanes.push({ id: "rh", name: "RH", color: "#3aa0d8", ext: [0, 100], pts: room, pick: function (p) { return p.rh; } });
     }
@@ -674,18 +715,44 @@
     var mains = metricPack.mains || [];
     var leak = metricPack.leak || [];
     var room = metricPack.room || [];
+    var storPts = metricPack.stor || [];
     var m = mains.length ? mains[mains.length - 1] : null;
     var l = leak.length ? leak[leak.length - 1] : null;
     var probe = room.length ? room[room.length - 1] : null;
+    var climate = "";
+    var s = storPts.length ? storPts[storPts.length - 1] : null;
+    if (s) {
+      [["Up", s.upper], ["Lo", s.lower], ["Cp", s.comp], ["Ct", s.cont]].forEach(function (row) {
+        if (row[1] == null || row[1] === 0) return;
+        climate += (climate ? "  " : "") + row[0] + " " + Number(row[1]).toFixed(1) + "°";
+      });
+      if (s.mock) climate = "SIM  " + climate;
+    } else if (m) {
+      [["A", m.tA, m.hA], ["B", m.tB, m.hB], ["C", m.tC, m.hC]].forEach(function (row) {
+        if (row[1] == null && row[2] == null) return;
+        if ((row[1] == null || row[1] === 0) && (row[2] == null || row[2] === 0)) return;
+        climate += (climate ? "  " : "") + row[0] + " " + (row[1] == null ? "" : row[1].toFixed(1) + "°");
+      });
+    }
     if (readTemp) {
-      readTemp.textContent = probe && probe.temp != null
+      readTemp.textContent = climate || (probe && probe.temp != null
         ? showTemp(probe.temp, metricPack.unit)
-        : (m ? Math.round(m.vA) + " / " + Math.round(m.vB) + " / " + Math.round(m.vC) + " V" : "no mains yet");
+        : (m ? Math.round(m.vA) + " / " + Math.round(m.vB) + " / " + Math.round(m.vC) + " V" : "no mains yet"));
     }
     if (readRest) {
-      var rest = l ? "leak " + l.mA + " / " + l.mB + " / " + l.mC + " mA" : "no leakage yet";
+      var rest = "";
+      if (s) [["Up", s.hUpper], ["Lo", s.hLower], ["Cp", s.hComp], ["Ct", s.hCont]].forEach(function (row) {
+        if (row[1] == null || row[1] === 0) return;
+        rest += (rest ? " " : "") + row[0] + " " + Math.round(row[1]) + "%";
+      });
+      if (m) [["A", m.hA], ["B", m.hB], ["C", m.hC]].forEach(function (row) {
+        if (row[1] == null || row[1] === 0) return;
+        rest += (rest ? " " : "") + row[0] + " " + Math.round(row[1]) + "%";
+      });
+      if (!rest) rest = l ? "leak " + l.mA + " / " + l.mB + " / " + l.mC + " mA" : "no leakage yet";
+      else if (l) rest += " · leak " + l.mA + "/" + l.mB + "/" + l.mC;
       if (m) rest += " · " + Math.round((m.wA || 0) + (m.wB || 0) + (m.wC || 0)) + " W";
-      if (probe && probe.rh != null) rest += " · " + Math.round(probe.rh) + "%";
+      if (!climate && probe && probe.rh != null) rest += " · " + Math.round(probe.rh) + "%";
       readRest.textContent = rest;
     }
     metricPack.lanes.forEach(function (lane) {
@@ -912,7 +979,21 @@
     bindHand();
   }
 
-  window.HoldDay = { paint: paint, hour: simHour, restart: restart };
+  function playTransfer() {
+    scrub = null;
+    replay = { from: 9.8, to: 12.8, started: Date.now(), duration: 30000 };
+  }
+
+  function exploreDay() {
+    anchorHour = simHour();
+    anchorMs = Date.now();
+    replay = null;
+  }
+
+  window.HoldDay = { paint: paint, hour: simHour, restart: restart,
+    playTransfer: playTransfer, explore: exploreDay,
+    replayState: function () { return replay ? { done: Date.now() - replay.started >= replay.duration } : null; }
+  };
   requestAnimationFrame(function spin() {
     moveHand();
     requestAnimationFrame(spin);

@@ -216,6 +216,7 @@ const state = {
   deskMains: [],
   deskLeak: [],
   deskRoom: [],
+  deskStor: [],
   deskRev: 0
 };
 
@@ -625,6 +626,17 @@ function applyDay(room, prev, h, simMin) {
   }
   if (id === "packhouse") {
     if (room.id === "leaf") {
+      // The transfer replay isolates one fault. The exploratory day retains the
+      // separate leafy-room heat/humidity scenario.
+      if (packReplayActive()) {
+        room.door = false;
+        room.temp = 1.1;
+        room.rh = 94;
+        room.dryMin = 0;
+        setFeed(room, 230, room.runW, "A");
+        room.autonomyLeft = room.autonomyMin;
+        return;
+      }
       const open = onSpan(h, 7, 9);
       const base = 0.6 + sun * 1.5;
       room.door = open;
@@ -1030,6 +1042,17 @@ function coordText(room) {
 }
 
 function renderStrip() {
+  if (packReplayActive()) {
+    const replay = HoldDay.replayState();
+    const room = state.rooms.find(function (r) { return r.id === "out"; });
+    const sup = packSupply(HoldDay.hour());
+    const restored = room && room.feed === "A" && room.volts > 40 && room.watts > 0 && room.temp <= room.band.max && room.temp >= room.band.min;
+    document.getElementById("strip").textContent = replay.done && restored
+      ? "SIM · Market cooler recovered on A · " + deg(room.temp) + " in band · phase B still needs repair"
+      : "SIM · Market cooler transfer · " + ({ hold: "running on B", fault: "B lost", break: "both contacts open", make: "A closed; checking cooling", run: "checking recovery" }[sup.step] || sup.step);
+    document.getElementById("blurb").textContent = fill(profile().blurb, null);
+    return;
+  }
   if (state.profileId === "desk") {
     const c = state.coldems;
     const room = state.rooms.filter(function (r) { return r.id === "feeder"; })[0];
@@ -1042,7 +1065,7 @@ function renderStrip() {
       bits.push(Math.round((c.watts[0] || 0) + (c.watts[1] || 0) + (c.watts[2] || 0)) + " W");
     } else bits.push(c && c.link === "connected" ? "meter quiet" : "waiting for mains");
     bits.push(c && c.leakageAlarm ? "leakage alarm" : "leakage quiet");
-    bits.push(room && room.envLive && room.temp != null ? toDisplay(room.temp).toFixed(1) + unitSuffix() : "no room probe");
+    bits.push((c && c.coldstor && c.coldstor.mock ? "SIM probes · " : "") + (storText(c) || climateText(c && c.climate) || "no room probe"));
     document.getElementById("strip").textContent = bits.join("  ·  ");
     document.getElementById("blurb").textContent = fill(profile().blurb, null);
     return;
@@ -1165,13 +1188,52 @@ function renderDetail() {
   if (input && document.activeElement !== input) input.value = room.deviceId || "";
 }
 
+function deskProbeDetails(node) {
+  if (!node || !node.coldstor) return "";
+  const names = { upper: "Upper storage", lower: "Lower storage", comp: "Compressor", cont: "Phase contactor" };
+  const probes = node.coldstor.probes || [];
+  return '<section class="desk-probes" aria-label="Cold storage probes"><h3>Cold storage probes</h3>' +
+    '<p class="hint">Storage probes describe the cold space. Compressor and contactor probes describe equipment. Mock values are SIM.</p>' +
+    '<div class="desk-probe-scroll"><table><thead><tr><th>Probe</th><th>Temperature</th><th>Humidity</th><th>Source</th><th>Quality / age</th></tr></thead><tbody>' +
+    probes.map(function (p) {
+      return '<tr><th scope="row">' + names[p.key] + (p.address == null ? '' : ' · ' + esc(p.address)) + '</th><td>' +
+        (p.temp == null ? '—' : esc(deg(p.temp))) + '</td><td>' + (p.rh == null ? '—' : Math.round(p.rh) + '%') +
+        '</td><td>' + (p.mock ? 'SIM' : 'node reported') + '</td><td>' + esc(p.quality) +
+        (p.age == null ? '' : ' · ' + Math.floor(p.age / 1000) + ' s') + '</td></tr>';
+    }).join('') + '</tbody></table></div></section>';
+}
+
+function deskHealthDetails(node) {
+  if (!node) return "";
+  const status = node.status || {};
+  const age = function (value) { return value == null ? "unknown" : (Math.max(0, Number(value)) / 1000).toFixed(1) + " s"; };
+  return '<ul class="facts">' + fact("Rule engine (reported)", status.rule_engine_ok == null ? "unknown" : status.rule_engine_ok ? "OK" : "fault") +
+    fact("Mains age (reported)", age(status.mains_data_age_ms)) + fact("Leakage age (reported)", age(status.leakage_data_age_ms)) +
+    fact("Last node action", node.lastAction || "unknown") + fact("Active alert codes", node.activeCodes || "unknown") +
+    fact("Neutral risk (reported)", node.neutral && node.neutral.neutral_risk || "unknown") + '</ul>';
+}
+
 function renderDeskDetail(room) {
   const c = state.coldems;
-  const temp = room.envLive && toDisplay(room.temp) != null ? toDisplay(room.temp).toFixed(1) + unitSuffix() : "no probe yet";
-  const rh = room.envLive && room.rh != null ? Math.round(room.rh) + "%" : "no probe yet";
+  const stor = storText(c);
+  const climate = climateText(c && c.climate);
+  const temp = stor || climate || (room.envLive && toDisplay(room.temp) != null ? toDisplay(room.temp).toFixed(1) + unitSuffix() : "no probe yet");
+  const rhBits = [];
+  if (c && c.coldstor) {
+    [["Upper", c.coldstor.hUpper], ["Lower", c.coldstor.hLower], ["Compressor", c.coldstor.hComp], ["Contactor", c.coldstor.hCont]].forEach(function (row) {
+      if (row[1] == null || !climateLive(null, row[1])) return;
+      rhBits.push(row[0] + " " + Math.round(row[1]) + "%");
+    });
+  } else if (c && c.climate) {
+    [["A", c.climate.hA], ["B", c.climate.hB], ["C", c.climate.hC]].forEach(function (row) {
+      if (row[1] == null || !climateLive(null, row[1])) return;
+      rhBits.push(row[0] + " " + Math.round(row[1]) + "%");
+    });
+  }
+  const rh = rhBits.length ? rhBits.join(" · ") : (room.envLive && room.rh != null ? Math.round(room.rh) + "%" : "no probe yet");
   const who = c && c.deviceId ? c.deviceId : "no node yet";
   document.getElementById("detail-body").innerHTML =
-    '<p class="kicker live">LIVE</p>' +
+    '<p class="kicker live">' + (c && c.coldstor && c.coldstor.mock ? "SIM probes" : "LIVE") + '</p>' +
     '<h2>Cold room feeder</h2>' +
     '<p class="place">' + esc(who) + (c && c.mdns ? " · " + esc(c.mdns) : "") + '</p>' +
     '<p class="action">DTM-EMS at the mains decides. COLD-EMS at the room enforces. This node is monitor-only until a site signs off a transfer. This page does not close a contactor.</p>' +
@@ -1183,6 +1245,7 @@ function renderDeskDetail(room) {
       fact("Leakage", c && c.leakageAlarm ? "alarm" : "quiet") +
       fact("Mode", c && c.monitorOnly === false ? "control armed" : "monitor only") +
     '</ul>' +
+    deskProbeDetails(c) + deskHealthDetails(c) +
     '<p class="aside">A dropped phase raises the call. Leakage blocks a move and calls a technician. A break-before-make shows here only after the node reports one.</p>';
   const phases = document.getElementById("phases");
   if (phases) {
@@ -1328,7 +1391,50 @@ function placeStage(world) {
   requestAnimationFrame(function () { window.dispatchEvent(new Event("resize")); });
 }
 
+function packReplayActive() {
+  return state.profileId === "packhouse" && window.HoldDay && HoldDay.replayState && !!HoldDay.replayState();
+}
+window.HoldPackReplay = packReplayActive;
+
+function renderPackDemo() {
+  const host = document.getElementById("pack-demo");
+  if (!host) return;
+  host.hidden = state.profileId !== "packhouse";
+  if (host.hidden) return;
+  const replay = window.HoldDay && HoldDay.replayState ? HoldDay.replayState() : null;
+  const hour = window.HoldDay ? HoldDay.hour() : 6;
+  const sup = packSupply(hour);
+  const room = state.rooms.find(function (r) { return r.id === "out"; });
+  const labels = ["On B", "B lost", "Both open", "Close A", replay && replay.done ? "Market cooler restored" : "Verify market cooler"];
+  const current = { hold: 0, fault: 1, break: 2, make: 3, run: 4 }[sup.step];
+  document.getElementById("pack-steps").innerHTML = labels.map(function (label, i) {
+    return '<li' + (i === current ? ' aria-current="step"' : '') + ' class="' +
+      (i === current ? 'current' : i < current ? 'complete' : '') + '">' + esc(label) + '</li>';
+  }).join("");
+  let text = "Play the complete simulated transfer. It stops on the recovery result; the separate leakage scenario stays on the day clock.";
+  if (replay) {
+    text = {
+      hold: "Before the fault: the market cooler is running on phase B.",
+      fault: "Phase B lost. The cooler stops. DTM-EMS checks headroom on A.",
+      break: "Transfer granted. Both contacts are open before A can close.",
+      make: "Phase A is closed. Checking compressor power and cooling recovery.",
+      run: "Cooler powered on A. Waiting for its temperature to return to band."
+    }[sup.step] || text;
+    const recovered = room && room.feed === "A" && room.volts > 40 && room.watts > 0 &&
+      room.temp >= room.band.min && room.temp <= room.band.max;
+    if (replay.done) text = recovered
+      ? "Resolved: market cooler running on A · " + Math.round(room.volts) + " V · " + Math.round(room.watts) + " W · " + deg(room.temp) + ", in band. Phase B still needs repair; the cooler no longer depends on it. SIM result held."
+      : "Power restored on A; cooling recovery is still pending. This simulation has not met all recovery checks.";
+  }
+  const result = document.getElementById("pack-result");
+  if (result.textContent !== text) result.textContent = text;
+  host.classList.toggle("resolved", !!(replay && replay.done && text.indexOf("Resolved:") === 0));
+  document.getElementById("pack-replay").textContent = replay ? "Replay transfer · 30 s" : "Play full transfer · 30 s";
+  document.getElementById("pack-explore").hidden = !replay;
+}
+
 function render() {
+  if (state.coldems && state.coldems.lastColdStor) state.coldems.coldstor = readStor(state.coldems.lastColdStor, state.coldems.coldstorReceived);
   var detail = document.getElementById("detail");
   var world = state.profileId === "clinic" || state.profileId === "packhouse" || state.profileId === "desk";
   if (detail) {
@@ -1348,6 +1454,7 @@ function render() {
   renderCall();
   paintScene();
   renderPhase();
+  renderPackDemo();
   if (window.HoldTelemetry) HoldTelemetry.paint();
   if (window.HoldDay) HoldDay.paint(state.profileId);
 }
@@ -1503,10 +1610,15 @@ window.HoldLive = liveFeed;
 window.HoldSelectCold = function (id) {
   if (!coldNodes.has(id)) return;
   state.coldems = coldNodes.get(id);
-  state.deskMains.length = 0; state.deskLeak.length = 0; state.deskRoom.length = 0;
+  state.deskMains.length = 0; state.deskLeak.length = 0; state.deskRoom.length = 0; state.deskStor.length = 0;
   state.deskRev += 1;
-  if (state.coldems.lastMains) rememberMains(epochMs(state.coldems.lastMains), state.coldems.lastMains);
+  if (state.coldems.lastMains) {
+    state.coldems.climate = readClimate(state.coldems.lastMains.phases);
+    rememberMains(epochMs(state.coldems.lastMains), state.coldems.lastMains);
+    applyClimateRoom(state.coldems);
+  }
   if (state.coldems.lastLeak) rememberLeak(epochMs(state.coldems.lastLeak), state.coldems.lastLeak);
+  if (state.coldems.lastColdStor) rememberStor(state.coldems.coldstorReceived, state.coldems.lastColdStor);
   loadDeskLog();
   applyColdRoom(state.coldems);
   paintCallFromCold(state.coldems);
@@ -1549,7 +1661,7 @@ function ensureCold(id) {
 
 function applyColdRoom(node) {
   const room = coldTarget();
-  if (!room || node !== state.coldems || !node.mainsValid) return;
+  if (!room || packReplayActive() || node !== state.coldems || !node.mainsValid) return;
   room.deviceId = node.deviceId;
   room.phases = node.watts.slice();
   room.watts = node.watts[0] + node.watts[1] + node.watts[2];
@@ -1562,7 +1674,7 @@ function applyColdRoom(node) {
 
 function paintCallFromCold(node) {
   const room = coldTarget();
-  if (!room || node !== state.coldems) return;
+  if (!room || packReplayActive() || node !== state.coldems) return;
   if (node.link === "lost" || (node.mainsSeen && !coldFresh(node))) {
     room.callWho = "COLD-EMS";
     room.callMessage = "Telemetry lost or stale. Check the node before relying on the last readings.";
@@ -1673,9 +1785,72 @@ function upsertPoint(list, point) {
   state.deskRev += 1;
 }
 
+function pickNum(obj, keys) {
+  if (!obj) return null;
+  let i;
+  let n;
+  for (i = 0; i < keys.length; i++) {
+    n = finiteNum(obj[keys[i]]);
+    if (n != null) return n;
+  }
+  return null;
+}
+
+const TEMP_KEYS = ["temperature_c", "temperature_C", "temp_c"];
+const RH_KEYS = ["humidity_pct", "humidity_percent", "humidity"];
+
+function readClimate(phases) {
+  const ph = phases || {};
+  return {
+    tA: pickNum(ph.A, TEMP_KEYS), tB: pickNum(ph.B, TEMP_KEYS), tC: pickNum(ph.C, TEMP_KEYS),
+    hA: pickNum(ph.A, RH_KEYS), hB: pickNum(ph.B, RH_KEYS), hC: pickNum(ph.C, RH_KEYS)
+  };
+}
+
+function climateLive(t, h) {
+  if (t == null && h == null) return false;
+  if ((t == null || t === 0) && (h == null || h === 0)) return false;
+  return true;
+}
+
+function climateText(c) {
+  if (!c) return "";
+  const bits = [];
+  [["A", c.tA, c.hA], ["B", c.tB, c.hB], ["C", c.tC, c.hC]].forEach(function (row) {
+    if (!climateLive(row[1], row[2])) return;
+    let bit = row[0] + " ";
+    if (row[1] != null) bit += row[1].toFixed(1) + "°C";
+    if (row[2] != null) bit += (row[1] != null ? " " : "") + Math.round(row[2]) + "%";
+    bits.push(bit);
+  });
+  return bits.join(" · ");
+}
+
+function firstClimate(c) {
+  const rows = [["tA", "hA"], ["tB", "hB"], ["tC", "hC"]];
+  let i;
+  for (i = 0; i < rows.length; i++) {
+    const t = c[rows[i][0]];
+    const h = c[rows[i][1]];
+    if (climateLive(t, h)) return { temp: t, rh: h };
+  }
+  return null;
+}
+
+function applyClimateRoom(node) {
+  if (!node || state.profileId !== "desk") return;
+  const hit = firstClimate(node.climate || {});
+  if (!hit) return;
+  const room = coldTarget();
+  if (!room) return;
+  applyEnv(room, { temperature_C: hit.temp, humidity_percent: hit.rh });
+  rememberRoom(node.mainsSeen || Date.now(), { temperature_C: hit.temp, humidity_percent: hit.rh });
+}
+
 function rememberMains(ts, msg) {
   if (!msg || !msg.phases) return;
   const ph = msg.phases;
+  const climate = readClimate(ph);
   upsertPoint(state.deskMains, {
     ts: ts,
     h: easternHour(ts),
@@ -1685,8 +1860,57 @@ function rememberMains(ts, msg) {
     wA: finiteNum(ph.A && ph.A.real_power_w),
     wB: finiteNum(ph.B && ph.B.real_power_w),
     wC: finiteNum(ph.C && ph.C.real_power_w),
-    hz: finiteNum(msg.totals && msg.totals.frequency_avg)
+    hz: finiteNum(msg.totals && msg.totals.frequency_avg),
+    tA: climate.tA, tB: climate.tB, tC: climate.tC,
+    hA: climate.hA, hB: climate.hB, hC: climate.hC
   });
+}
+
+const STOR_SENSORS = [
+  ["upper_storage_temp", "upper", "hUpper"],
+  ["lower_storage_temp", "lower", "hLower"],
+  ["compressor_temp", "comp", "hComp"],
+  ["phase_contactor_temp", "cont", "hCont"]
+];
+
+function readStor(msg, received, now) {
+  const sensors = msg && msg.sensors || {};
+  const at = now == null ? Date.now() : now;
+  const elapsed = received == null ? 0 : Math.max(0, at - received);
+  const out = { mock: false, probes: [] };
+  STOR_SENSORS.forEach(function (row) {
+    const probe = sensors[row[0]];
+    const age = probe ? Math.max(0, Number(probe.age_ms) || 0) + elapsed : null;
+    const mock = probe && typeof probe.mock === "boolean" ? probe.mock : !!(msg && (msg.mock === true || msg.simulated === true));
+    const quality = !probe ? "missing" : probe.valid === false ? "invalid" : age > 60000 ? "stale" : "valid";
+    out[row[1]] = quality === "valid" ? pickNum(probe, TEMP_KEYS) : null;
+    out[row[2]] = quality === "valid" ? pickNum(probe, RH_KEYS) : null;
+    out.mock = out.mock || mock;
+    out.probes.push({ id: row[0], key: row[1], temp: out[row[1]], rh: out[row[2]],
+      address: probe && probe.modbus_address, age: age, quality: quality, mock: mock });
+  });
+  return out;
+}
+
+function storText(node) {
+  const s = node && node.coldstor;
+  if (!s) return "";
+  const names = [["upper", "hUpper", "Upper"], ["lower", "hLower", "Lower"], ["comp", "hComp", "Compressor"], ["cont", "hCont", "Contactor"]];
+  const bits = [];
+  names.forEach(function (row) {
+    if (!climateLive(s[row[0]], s[row[1]])) return;
+    let bit = row[2] + " ";
+    if (s[row[0]] != null) bit += Number(s[row[0]]).toFixed(1) + "°C";
+    if (s[row[1]] != null) bit += " " + Math.round(s[row[1]]) + "%";
+    bits.push(bit);
+  });
+  return bits.join(" · ");
+}
+
+function rememberStor(ts, msg) {
+  const stor = readStor(msg, ts, ts);
+  if (!climateLive(stor.upper, stor.hUpper) && !climateLive(stor.lower, stor.hLower) && !climateLive(stor.comp, stor.hComp) && !climateLive(stor.cont, stor.hCont)) return;
+  upsertPoint(state.deskStor, Object.assign({ ts: ts, h: easternHour(ts) }, stor));
 }
 
 function rememberRoom(ts, msg) {
@@ -1729,13 +1953,14 @@ function loadDeskLog() {
   }
   pull("mains", rememberMains);
   pull("leakage", rememberLeak);
+  pull("coldstor", rememberStor);
   ["probes", "probe", "sht", "env"].forEach(function (kind) {
     pull(kind, rememberRoom);
   });
 }
 
 window.HoldDeskSeries = function () {
-  return { mains: state.deskMains, leak: state.deskLeak, room: state.deskRoom, unit: state.unit, rev: state.deskRev };
+  return { mains: state.deskMains, leak: state.deskLeak, room: state.deskRoom, stor: state.deskStor, unit: state.unit, rev: state.deskRev };
 };
 
 function ingestCold(parts, raw) {
@@ -1765,7 +1990,11 @@ function ingestCold(parts, raw) {
     node.mainsSeen = Math.min(Date.now(), epochMs(msg)) - Math.max(0, Number(msg.age_ms) || 0);
     node.mainsValid = msg.valid !== false && msg.mock !== true && msg.simulated !== true && msg.data_mode !== "simulated" && node.volts.some(function (v) { return v > 40; });
     node.lastMains = msg;
-    if (node === state.coldems) rememberMains(epochMs(msg), msg);
+    node.climate = readClimate(msg.phases);
+    if (node === state.coldems) {
+      rememberMains(epochMs(msg), msg);
+      applyClimateRoom(node);
+    }
     applyColdRoom(node);
   } else if (leaf === "epem") {
     node.mdns = msg.mdns_name || node.mdns;
@@ -1787,6 +2016,12 @@ function ingestCold(parts, raw) {
     node.neutral = msg;
   } else if (leaf === "status") {
     node.status = msg;
+  } else if (leaf === "coldstor" && msg.sensors) {
+    node.lastColdStor = msg;
+    node.coldstorReceived = Date.now();
+    node.coldstor = readStor(msg, node.coldstorReceived);
+    node.coldstor.mock = !!(msg.mock === true || msg.simulated === true || node.coldstor.mock);
+    if (node === state.coldems) rememberStor(epochMs(msg), msg);
   } else if (leaf === "automation") {
     node.lastAction = msg.last_action || "";
     node.monitorOnly = msg.monitor_only !== false;
@@ -1796,12 +2031,12 @@ function ingestCold(parts, raw) {
     : (Array.isArray(msg.probes) ? msg.probes.filter(function (p) {
         return p && (p.temperature_C != null || p.humidity_percent != null);
       })[0] : null);
-  if (probe && node === state.coldems) {
+  if (probe && node === state.coldems && !packReplayActive()) {
     rememberRoom(epochMs(msg), probe);
     const room = coldTarget();
     if (room) applyEnv(room, probe);
   }
-  const boardC = msg.dtm_temp != null ? msg.dtm_temp : (msg.coldems_temp != null ? msg.coldems_temp : msg["COLD-EMS_temp"]);
+  const boardC = msg.dtm_temp != null ? msg.dtm_temp : (msg.cold_ems_temp != null ? msg.cold_ems_temp : (msg.coldems_temp != null ? msg.coldems_temp : msg["COLD-EMS_temp"]));
   if (boardC != null && boardC !== "") node.boardC = Number(boardC);
   paintCallFromCold(node);
 }
@@ -1987,6 +2222,20 @@ function boot() {
   requestAnimationFrame(showScene);
   window.addEventListener("load", showScene);
 
+  document.getElementById("pack-replay").addEventListener("click", function () {
+    HoldDay.playTransfer();
+    state.rooms = buildRooms("packhouse");
+    state.selected = "out";
+    simPrev = HoldDay.hour();
+    state.rooms.forEach(function (room) { applyDay(room, simPrev, simPrev, 0); });
+    render();
+    if (detail) detail.scrollTop = 0;
+  });
+  document.getElementById("pack-explore").addEventListener("click", function () {
+    HoldDay.explore();
+    render();
+  });
+
   document.getElementById("unit").addEventListener("click", function (ev) {
     const btn = ev.target.closest("[data-unit]");
     if (!btn) return;
@@ -2005,7 +2254,10 @@ function boot() {
     simPrev = window.HoldDay ? HoldDay.hour() : 6;
     state.rooms = buildRooms(state.profileId);
     if (state.inbox[state.profileId]) applyGeoJSON(state.inbox[state.profileId]);
-    if (state.coldems) applyColdRoom(state.coldems);
+    if (state.coldems) {
+      applyColdRoom(state.coldems);
+      applyClimateRoom(state.coldems);
+    }
     state.selected = state.profileId === "packhouse" ? "out" : state.rooms[0].id;
     if (state.profileId === "desk") loadDeskLog();
     renderSwitch();

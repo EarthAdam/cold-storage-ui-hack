@@ -470,6 +470,13 @@ function makePad(id, x, z, color) {
   return { id: id, group: g, body: bodyMat, hinge: null, fan: null, edges: edges, label: label, open: false, fanOn: false, hot: false, cold: false };
 }
 
+// Closed routes stay outside the packinghouse, grinder and battery bank.
+// Leave at least 1.5 world units for the tractor footprint through each turn.
+const FARM_TRACTOR_ROUTES = [
+  [[-34, -18], [-12.5, -18], [-12.5, 24], [-34, 24]],
+  [[8, -24], [38, -24], [38, 20], [18, 20], [18, -8], [8, -8]]
+];
+
 function makeTractor(color) {
   var rig = new THREE.Group();
   rig.add(box(1.15, 0.55, 1.9, mat(color, 0.55, 0.08), 0, 0.62, 0));
@@ -747,7 +754,8 @@ function paintLiveCircuit(live, now) {
 function paintCircuit(hour, now) {
   if (!circuit) return;
   var live = window.HoldLive && window.HoldLive();
-  if ((window.HoldDesk && window.HoldDesk()) || (live && live.mainsValid)) {
+  var replay = window.HoldPackReplay && window.HoldPackReplay();
+  if (!replay && ((window.HoldDesk && window.HoldDesk()) || (live && live.mainsValid))) {
     paintLiveCircuit(live, now);
     return;
   }
@@ -866,13 +874,24 @@ function buildFarm() {
   paintLabel(grind, { name: "Grinder", temp: "", sub: "packhouse yard", stock: "" });
   scene.add(grind.sprite);
 
+  // Draw the same routes the vehicles follow, so the access lanes are visible.
+  var laneMat = mat(0x6b4428, 0.95, 0);
+  FARM_TRACTOR_ROUTES.forEach(function (route) {
+    route.forEach(function (point, i) {
+      var next = route[(i + 1) % route.length];
+      scene.add(box(Math.abs(next[0] - point[0]) + 2.8, 0.05,
+        Math.abs(next[1] - point[1]) + 2.8, laneMat,
+        (point[0] + next[0]) / 2, 0.07, (point[1] + next[1]) / 2));
+    });
+  });
+
   tractor = makeTractor(0xe25b1a);
-  tractor.userData.path = [[-32, -16], [-12, -16], [-12, 22], [-32, 22]];
+  tractor.userData.path = FARM_TRACTOR_ROUTES[0];
   tractor.userData.ms = 14000;
   tractor.userData.phase = 0.1;
   scene.add(tractor);
   tractor2 = makeTractor(0xc47a12);
-  tractor2.userData.path = [[8, -22], [36, -22], [36, 16], [8, 16]];
+  tractor2.userData.path = FARM_TRACTOR_ROUTES[1];
   tractor2.userData.ms = 16000;
   tractor2.userData.phase = 0.55;
   scene.add(tractor2);

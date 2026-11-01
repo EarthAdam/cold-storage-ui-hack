@@ -32,3 +32,64 @@ if (!t.status(t.topics.get('old'),Date.now()).includes('STALE')) throw Error('re
 send('one','status',null);
 console.log('MQTT regression checks passed');
 `,ctx);
+
+// Run the real day clock through the complete transfer without waiting 30 seconds.
+ctx.requestAnimationFrame = function () {};
+vm.runInContext(fs.readFileSync(path+'/day.js','utf8'),ctx);
+ctx.HoldDay = ctx.window.HoldDay;
+vm.runInContext(`
+const realNow = Date.now;
+let replayNow = realNow();
+Date.now = function () { return replayNow; };
+try {
+  state.profileId = 'packhouse'; state.coldems = null;
+  state.rooms = buildRooms('packhouse');
+  const cooler = state.rooms.find(function (r) { return r.id === 'out'; });
+  HoldDay.playTransfer();
+  let previous = HoldDay.hour();
+  const visited = new Set();
+  for (let second=0; second<=30; second++) {
+    const h = HoldDay.hour();
+    const supply = packSupply(h);
+    visited.add(supply.step);
+    state.rooms.forEach(function (r) { applyDay(r, previous, h, Math.max(0,h-previous)*60); });
+    const leaf = state.rooms.find(function (r) { return r.id === "leaf"; });
+    if (judge(leaf).level !== "safe") throw Error("unrelated leafy-room fault leaked into transfer replay");
+    if (supply.step === 'break' && (cooler.watts !== 0 || cooler.feed !== 'open')) throw Error('break must isolate the load');
+    if (supply.step === 'fault' && cooler.watts !== 0) throw Error('lost phase must stop cooler');
+    previous = h;
+    if (second<30) replayNow += 1000;
+  }
+  if (['hold','fault','break','make','run'].some(function (s) { return !visited.has(s); })) throw Error('replay skipped a transfer stage');
+  if (cooler.feed !== 'A' || cooler.volts !== 230 || cooler.watts <= 0 || cooler.temp > cooler.band.max) throw Error('cooler never recovered');
+  if (!HoldDay.replayState().done) throw Error('replay has no ending');
+  const finalHour = HoldDay.hour(); replayNow += 60000;
+  if (HoldDay.hour() !== finalHour || packSupply(HoldDay.hour()).step !== 'run') throw Error('ending rolled into a new fault');
+  if (packSupply(finalHour).volts[1] >= 40) throw Error('transfer must not pretend B was repaired');
+  console.log('Packhouse full transfer and held recovery checks passed');
+} finally { Date.now = realNow; }
+`,ctx);
+
+// Check complete route segments, including closure and turning clearance.
+const dollSource = fs.readFileSync(path+'/doll.js','utf8');
+const routesMatch = dollSource.match(/const FARM_TRACTOR_ROUTES = (\[[\s\S]*?\n\]);/);
+assert(routesMatch, 'tractor routes must be inspectable');
+const routes = vm.runInNewContext(routesMatch[1]);
+const obstacles = [
+  { name: 'packinghouse', minX: -1.87, maxX: 8.27, minZ: 4.13, maxZ: 9.6 },
+  { name: 'grinder and drum', minX: -10.6, maxX: -6.4, minZ: 4.65, maxZ: 8.6 },
+  { name: 'battery bank', minX: 9.38, maxX: 13.8, minZ: 4.84, maxZ: 6.36 }
+];
+const clearance = 1.5;
+for (const route of routes) {
+  for (let i=0; i<route.length; i++) {
+    const a = route[i], b = route[(i+1)%route.length];
+    assert(a[0] === b[0] || a[1] === b[1], 'access lanes must be axis-aligned');
+    for (const obstacle of obstacles) {
+      const crosses = Math.max(a[0], b[0]) >= obstacle.minX-clearance && Math.min(a[0],b[0]) <= obstacle.maxX+clearance &&
+        Math.max(a[1],b[1]) >= obstacle.minZ-clearance && Math.min(a[1],b[1]) <= obstacle.maxZ+clearance;
+      assert(!crosses, 'tractor route intersects '+obstacle.name+' including turning clearance');
+    }
+  }
+}
+console.log('Tractor routes clear buildings and equipment');
