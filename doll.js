@@ -562,7 +562,7 @@ function buildCircuit() {
   });
   var ems = box(1.55, 1.75, 0.36, emsMat, -4.2, 2.05, 12.55);
   scene.add(ems);
-  var emsLabel = tag("Street-EMS", "on phase B", "box on the pole", -4.2, 3.6, 12.2, 3.4);
+  var emsLabel = tag("COLD-EMS", "on phase B", "box on the pole", -4.2, 3.6, 12.2, 3.4);
   tag("Pole", "mains", "three phase in", -4.2, 4.6, 12.2, 2.2);
 
   var A = 0xe6c56a;
@@ -737,7 +737,7 @@ function paintLiveCircuit(live, now) {
   circuit.emsMat.emissive.setHex(names.length || live.leakageAlarm ? 0xe24b4b : 0x3d9a4a);
   circuit.emsMat.emissiveIntensity = 0.7;
   paintLabel(circuit.emsLabel, {
-    name: "Street-EMS",
+    name: "COLD-EMS",
     temp: "LIVE " + line,
     sub: "box on the pole",
     stock: live.deviceId.slice(-6)
@@ -755,7 +755,7 @@ function paintCircuit(hour, now) {
   var step = sup.step || "hold";
   var fault = !!sup.fault;
   var bClosed = step === "hold" || step === "fault";
-  var aClosed = step === "make" || step === "run";
+  var aClosed = step === "make" || step === "run" || step === "leak";
   var k = reduce ? 1 : 0.18;
   circuit.bSw.hinge.rotation.y += ((bClosed ? 0 : -1.15) - circuit.bSw.hinge.rotation.y) * k;
   circuit.aSw.hinge.rotation.y += ((aClosed ? 0 : 1.15) - circuit.aSw.hinge.rotation.y) * k;
@@ -787,18 +787,19 @@ function paintCircuit(hour, now) {
   setGlow(circuit.bSw.blade, bCarry ? 0x7dcea0 : (bClosed ? 0xe24b4b : 0x8a8478), bClosed ? 0.6 : 0.05);
   setGlow(circuit.aSw.blade, 0xe6c56a, aClosed ? 0.75 : 0.05);
 
-  var emsHex = (step === "break" || step === "make") ? 0xe6c56a : (step === "fault" ? 0xe24b4b : 0x3d9a4a);
+  var emsHex = step === "leak" || step === "fault" ? 0xe24b4b : ((step === "break" || step === "make") ? 0xe6c56a : 0x3d9a4a);
   circuit.emsMat.emissive.setHex(emsHex);
   circuit.emsMat.emissiveIntensity = step === "hold" ? 0.2 : 0.75;
   var line = {
     hold: "on phase B",
-    fault: "sees B down",
-    break: "opens off B",
+    fault: "B lost",
+    break: "both open",
     make: "closes onto A",
-    run: "now on A"
+    run: "verified on A",
+    leak: "leakage blocks"
   }[step] || "";
   paintLabel(circuit.emsLabel, {
-    name: "Street-EMS",
+    name: "COLD-EMS",
     temp: line,
     sub: "box on the pole",
     stock: "SIM"
@@ -966,7 +967,7 @@ function buildMode(profile) {
   canvas.setAttribute("aria-label", profile === "desk"
     ? "Live COLD-EMS feeder. Three phases, the pole box, and a phase fault when the node reports one."
     : profile === "packhouse"
-    ? "Packhouse feeder. Three phases leave the pole. Street-EMS is the box on the pole. Phase B faults on its incomer. The market cooler moves onto phase A."
+    ? "Packhouse feeder. Three phases leave the pole. COLD-EMS is the box on the pole. Phase B faults on its incomer. The market cooler moves onto phase A. Contactors are simulated."
     : "Cutaway clinic. Reception, waiting, lunch, store, and the cold room. People move during clinic hours. Click a cabinet.");
 }
 
@@ -1134,7 +1135,7 @@ function sync(host, profile, rooms) {
     noteEl.textContent = profile === "desk"
       ? "Live feeder. The box is COLD-EMS. A dark phase is down. Drag to look."
       : profile === "packhouse"
-      ? "Street-EMS is the box on the pole. Phase B breaks on the incomer. Drag to look. Click a cold room."
+      ? "COLD-EMS is the box on the pole. DTM-EMS grants the move. Drag to look. Click a cold room."
       : "Cutaway clinic. Drag to look. People move 08:00–17:00. Click a cabinet.";
   }
   if (mode !== profile) {

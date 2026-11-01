@@ -844,7 +844,9 @@ footer a { color: var(--safe); }
 .day-svg .read.rest { fill: #c5d4cc; font-size: 10px; }
 .day-svg .trace { fill: none; stroke-width: 1.35; stroke-linejoin: round; stroke-linecap: round; }
 .day-svg .trace.pick { stroke-width: 2.2; }
-.day-svg .trace.rh, .day-svg .trace.power { stroke-dasharray: 5 3; }
+.day-svg .trace.rh, .day-svg .trace.power, .day-svg .trace.leak { stroke-dasharray: 5 3; }
+body[data-trade="desk"] .day-svg .hand-hit,
+body[data-trade="desk"] .day-svg .tip-hit { pointer-events: none; cursor: default; }
 .day-svg .trace.battery { stroke-width: 2.4; }
 .day-svg .door-tick { stroke-width: 1.8; stroke-linecap: round; }
 .day-svg .now-dot { stroke: #101411; stroke-width: 0.7; }

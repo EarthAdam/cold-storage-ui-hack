@@ -1,6 +1,6 @@
 # Disclosure
 
-Global Energy Hackathon, 30 Oct – 1 Nov 2026. Brief 01, off-grid cold storage for clinics.
+Global Energy Hackathon, 30 Oct – 1 Nov 2026. Team brief: Nigerian packhouse cold rooms. Track 1, new tech and hardware, non-residential.
 
 This file is the public split between what existed before the weekend and what this repository added. It is not a bill of materials and it is not a measured uptime claim.
 
@@ -14,7 +14,7 @@ Private cold-ems work, leakage sensing, and hardware design stay in their own tr
 
 Tag `geh-2026-desk` marks this tree.
 
-An operator desk for three trades: Clinic, Landing, and Packhouse. Clinic is the scored story. The other two use the same listen-only screen in a second place.
+An operator desk for the packhouse, plus Clinic and Landing on the same switch. The packhouse is the scored story: a simulated phase-B fault, a break-before-make onto phase A, and a leakage block. Desk is the live monitor-only feeder. The page listens. It does not command a contactor.
 
 The desk shows a simulated day, a round clock, a clinic cutaway, a farm, and a landing map. A call-to-action bar reads a proposed `maintenance.message` when a payload carries it. On the illustrative clinic day, the same bar speaks the sentence a phone would carry. A live board message replaces that sentence. An empty message clears it.
 

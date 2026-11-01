@@ -58,10 +58,8 @@
       name: "COLD-EMS",
       lat: 0,
       lng: 0,
-      line: "Live feeder. The phases and the call come from the node.",
-      rings: [
-        { id: "live", name: "Live", color: "#7dcea0", label: "COLD-EMS is watching. It does not switch from this page.", spans: [{ from: 0, to: 12 }, { from: 12, to: 24 }] }
-      ]
+      line: "The hand is Eastern time. The lines are phase volts and leakage from the node.",
+      rings: []
     }
   };
 
@@ -83,6 +81,39 @@
 
   function eatNow() {
     return new Date(Date.now() + TZ * 3600000);
+  }
+
+  function easternParts(ts) {
+    return new Intl.DateTimeFormat("en-US", {
+      timeZone: "America/New_York",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+      hourCycle: "h23"
+    }).formatToParts(new Date(ts));
+  }
+
+  function easternNum(parts, type) {
+    var i;
+    for (i = 0; i < parts.length; i++) {
+      if (parts[i].type === type) return Number(parts[i].value);
+    }
+    return 0;
+  }
+
+  function easternHour(ts) {
+    var parts = easternParts(ts);
+    var h = easternNum(parts, "hour");
+    if (h === 24) h = 0;
+    return h + easternNum(parts, "minute") / 60 + easternNum(parts, "second") / 3600;
+  }
+
+  function easternDateKey(ts) {
+    var parts = easternParts(ts);
+    return easternNum(parts, "year") + "-" + easternNum(parts, "month") + "-" + easternNum(parts, "day");
   }
 
   function hoursNow() {
@@ -262,7 +293,9 @@
     }
     if (lead) lead.textContent = profile.line;
     if (sunEl) {
-      sunEl.textContent = profile.name + " · rise " + fmt(light.rise) + " · noon " + fmt(light.noon) + " · set " + fmt(light.set);
+      sunEl.textContent = id === "desk"
+        ? "Eastern time · America/New_York"
+        : profile.name + " · rise " + fmt(light.rise) + " · noon " + fmt(light.noon) + " · set " + fmt(light.set);
     }
     var thick = 10;
     var gap = 2;
@@ -293,8 +326,10 @@
     metricR0 = 58;
     handIn = 48;
     handOut = 214;
-    var wash = '<path class="wash civil" d="' + arc(metricR0, 198, light.civil0, light.civil1) + '"/>' +
-      '<path class="wash day" d="' + arc(metricR0, 198, light.rise, light.set) + '"/>';
+    var wash = id === "desk" ? "" : (
+      '<path class="wash civil" d="' + arc(metricR0, 198, light.civil0, light.civil1) + '"/>' +
+      '<path class="wash day" d="' + arc(metricR0, 198, light.rise, light.set) + '"/>'
+    );
     var noon = polar(12, handOut);
     host.innerHTML =
       '<svg class="day-svg" viewBox="0 0 500 500" role="img" aria-label="24 hour clock for ' + esc(profile.name) + '. Noon at the top, midnight at the bottom, clockwise.">' +
@@ -308,7 +343,7 @@
         '<circle class="tip-hit" data-tip-hit="1" cx="' + noon[0].toFixed(1) + '" cy="' + noon[1].toFixed(1) + '" r="16"/>' +
         '<circle class="hub" cx="' + CX + '" cy="' + CY + '" r="40"/>' +
         '<text class="clock" data-time="1" x="' + CX + '" y="' + (CY - 6) + '">00:00:00</text>' +
-        '<text class="clock-sub" x="' + CX + '" y="' + (CY + 10) + '">drag hand</text>' +
+        '<text class="clock-sub" x="' + CX + '" y="' + (CY + 10) + '">' + (id === "desk" ? "Eastern" : "drag hand") + '</text>' +
         '<text class="read" data-read="temp" x="' + CX + '" y="' + (CY + 24) + '"></text>' +
         '<text class="read rest" data-read="rest" x="' + CX + '" y="492"></text>' +
         '<text class="hover-id" x="0" y="0" visibility="hidden"></text>' +
@@ -322,7 +357,29 @@
     readRest = host.querySelector("[data-read=rest]");
     metricKey = "";
     rows = [];
-    if (key) {
+    if (key && id === "desk") {
+      key.innerHTML = [
+        ["vA", "#e6c56a", "Phase A", "COLDAMI/mains · phases.A.voltage_ln"],
+        ["vB", "#7dcea0", "Phase B", "COLDAMI/mains · phases.B.voltage_ln"],
+        ["vC", "#3aa0d8", "Phase C", "COLDAMI/mains · phases.C.voltage_ln"],
+        ["mA", "#e08a62", "Leak A", "COLDAMI/leakage · sensors.A.leakage_ma"],
+        ["mB", "#c4a574", "Leak B", "COLDAMI/leakage · sensors.B.leakage_ma"],
+        ["mC", "#e7a090", "Leak C", "COLDAMI/leakage · sensors.C.leakage_ma"]
+      ].map(function (row) {
+        return '<button type="button" class="day-row" data-trace="' + row[0] + '">' +
+          '<i style="background:' + row[1] + '"></i>' +
+          "<b>" + row[2] + "</b>" +
+          "<span>" + row[3] + "</span>" +
+          "</button>";
+      }).join("");
+      rows = [].slice.call(key.querySelectorAll(".day-row"));
+      rows.forEach(function (row) {
+        row.addEventListener("mouseenter", function () { dim(null, row.getAttribute("data-trace")); });
+        row.addEventListener("mouseleave", function () { dim(null, null); });
+        row.addEventListener("focus", function () { dim(null, row.getAttribute("data-trace")); });
+        row.addEventListener("blur", function () { dim(null, null); });
+      });
+    } else if (key) {
       var work = rings.map(function (ring) {
         var rowsHtml = ring.spans.map(function (span) {
           return '<button type="button" class="day-row' + (ring.watch ? " watch" : "") + '" data-ring="' + ring.id +
@@ -389,6 +446,7 @@
   }
 
   function simHour() {
+    if (window.HoldDesk && window.HoldDesk()) return easternHour(Date.now());
     if (scrub != null) return normHour(scrub);
     var h = normHour(anchorHour);
     var left = Date.now() - anchorMs;
@@ -427,6 +485,7 @@
     face.setAttribute("data-hand-drag", "1");
     var dragging = false;
     face.addEventListener("pointerdown", function (ev) {
+      if (window.HoldDesk && window.HoldDesk()) return;
       var hit = ev.target.closest && ev.target.closest("[data-hand-hit], [data-tip-hit]");
       if (!hit || !face.contains(hit)) return;
       dragging = true;
@@ -526,7 +585,74 @@
     return best;
   }
 
+  function deskTrace(pts, pick, ext, id, color, leak) {
+    var d = poly(pts, pick, ext);
+    if (!d) return "";
+    return '<path class="hit" data-id="' + id + '" d="' + d + '"/>' +
+      '<path class="trace pick' + (leak ? " leak" : "") + '" data-id="' + id + '" data-trace="' + id + '" d="' + d +
+      '" stroke="' + color + '"><title>' + esc(id) + "</title></path>" +
+      '<circle class="now-dot" data-dot="' + id + '" r="2.6" fill="' + color + '"/>';
+  }
+
+  function drawDeskMetrics() {
+    var g = document.querySelector(".day-svg .metrics");
+    if (!g || !window.HoldDeskSeries) return;
+    var pack = window.HoldDeskSeries();
+    var mains = pack.mains || [];
+    var leak = pack.leak || [];
+    var key = "desk:" + pack.rev;
+    if (key === metricKey && g.childNodes.length) return;
+    metricKey = key;
+    var hi = 1;
+    leak.forEach(function (p) {
+      [p.mA, p.mB, p.mC].forEach(function (v) {
+        if (v != null && v > hi) hi = v;
+      });
+    });
+    pack.vExt = [0, 260];
+    pack.mExt = [0, hi * 1.15];
+    metricPack = pack;
+    g.innerHTML =
+      deskTrace(mains, function (p) { return p.vA; }, pack.vExt, "vA", "#e6c56a", false) +
+      deskTrace(mains, function (p) { return p.vB; }, pack.vExt, "vB", "#7dcea0", false) +
+      deskTrace(mains, function (p) { return p.vC; }, pack.vExt, "vC", "#3aa0d8", false) +
+      deskTrace(leak, function (p) { return p.mA; }, pack.mExt, "mA", "#e08a62", true) +
+      deskTrace(leak, function (p) { return p.mB; }, pack.mExt, "mB", "#c4a574", true) +
+      deskTrace(leak, function (p) { return p.mC; }, pack.mExt, "mC", "#e7a090", true);
+  }
+
+  function readDesk(h) {
+    drawDeskMetrics();
+    if (!metricPack || !metricPack.mains) return;
+    var mains = metricPack.mains;
+    var leak = metricPack.leak || [];
+    var m = mains.length ? mains[mains.length - 1] : null;
+    var l = leak.length ? leak[leak.length - 1] : null;
+    if (readTemp) {
+      readTemp.textContent = m
+        ? Math.round(m.vA) + " / " + Math.round(m.vB) + " / " + Math.round(m.vC) + " V"
+        : "no mains yet";
+    }
+    if (readRest) {
+      readRest.textContent = l
+        ? "leak " + l.mA + " / " + l.mB + " / " + l.mC + " mA"
+        : "no leakage yet";
+    }
+    if (!m) return;
+    placeDot("vA", h, rAt(m.vA, metricPack.vExt));
+    placeDot("vB", h, rAt(m.vB, metricPack.vExt));
+    placeDot("vC", h, rAt(m.vC, metricPack.vExt));
+    if (!l) return;
+    placeDot("mA", h, rAt(l.mA, metricPack.mExt));
+    placeDot("mB", h, rAt(l.mB, metricPack.mExt));
+    placeDot("mC", h, rAt(l.mC, metricPack.mExt));
+  }
+
   function drawMetrics() {
+    if (window.HoldDesk && window.HoldDesk()) {
+      drawDeskMetrics();
+      return;
+    }
     var g = document.querySelector(".day-svg .metrics");
     if (!g || !window.HoldCurves) return;
     var pack = window.HoldCurves();
@@ -595,6 +721,10 @@
   }
 
   function readNow(h) {
+    if (window.HoldDesk && window.HoldDesk()) {
+      readDesk(h);
+      return;
+    }
     drawMetrics();
     if (!metricPack || !readTemp) return;
     var sel = null;
@@ -721,7 +851,9 @@
 
   function paint(id) {
     var parts = dateParts();
-    var key = id + ":" + parts.y + "-" + parts.m + "-" + parts.d;
+    var key = id === "desk"
+      ? "desk:" + easternDateKey(Date.now())
+      : id + ":" + parts.y + "-" + parts.m + "-" + parts.d;
     if (drawn !== key) {
       drawn = key;
       build(id);

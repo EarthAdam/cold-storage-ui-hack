@@ -2,7 +2,7 @@
 
 Global Energy Hackathon, 30 Oct – 1 Nov 2026. The team is Glenn, Bonheur, Ella, Ademola, Adam, and Sam.
 
-This repo is the open screen for that entry. The case is a packhouse on a weak three-phase supply. Phase B drops. The market cooler is a single-phase circuit, so Street-EMS opens it off B and closes it onto phase A. Hold draws that move. It does not command the contactors. The clinic and the fish landing are still on the switch. They are not the opening view.
+This repo is the open screen for that entry. The case is a Nigerian packhouse on a weak three-phase supply. Phase B drops. DTM-EMS at the mains grants a move. COLD-EMS at the market cooler, a single-phase circuit, opens it off B and closes it onto phase A. Hold draws that move and labels it SIM. It does not command the contactors. A leakage fault blocks the move and calls a technician. The clinic and the fish landing stay on the switch. They are not the opening view.
 
 ## Open
 
@@ -16,12 +16,12 @@ The header switch changes °C and °F on screen. Messages stay in Celsius (`temp
 
 ## Trades
 
-- **Packhouse** — the opening view. The farm scene shows the three-phase yard, the fault on phase B, and the Street-EMS box on the pole moving the market cooler onto phase A. The contactors are simulated.
-- **Desk** — the live COLD-EMS feeder. Phase volts, leakage, and the call come from `nesl_coldems`. A quiet meter stays unmarked. A dropped phase or a leakage alarm is the call. The page does not switch a contactor.
+- **Packhouse** — the opening view. The farm scene shows the three-phase yard, the fault on phase B, and the COLD-EMS box on the pole moving the market cooler onto phase A. The contactors are simulated. From 13:00 to 14:00 a leakage fault blocks the next move.
+- **Desk** — the live COLD-EMS feeder. Phase volts, leakage, and the call come from `nesl_coldems`. A quiet meter stays unmarked. The bench node is monitor-only, so a dropped phase raises a call and does not move the cooler. The page does not switch a contactor.
 - **Clinic** — vaccines, oxytocin, insulin. Freeze is as bad as heat. Cutaway of the building.
 - **Landing** — ice, the day's catch, a blast freezer. Map of the creek.
 
-A clock sits to the right of the scene. The day starts at 06:00, runs fast until 10:00, then slows. The phase fault waits for that slow stretch. Drag the hour hand to rewind into it. Phase B falls, Street-EMS opens the market cooler off B, then closes it onto A. A battery charges while the sun is up and discharges after. The same level is on the clock. A corner sentence names who should act. Prices on the page are estimates, not quotes.
+A clock sits to the right of the scene. The day starts at 06:00, runs fast until 10:00, then slows. The phase fault waits for that slow stretch. Drag the hour hand to rewind into it. Phase B falls, COLD-EMS opens the market cooler off B, then closes it onto A. Drag to 13:00 to see the leakage block. On Desk the hand is Eastern time and the lines are the live MQTT volts and leakage. A battery charges while the sun is up and discharges after. The same level is on the packhouse clock. A corner sentence names who should act. Prices on the page are estimates, not quotes.
 
 ## MQTT
 
