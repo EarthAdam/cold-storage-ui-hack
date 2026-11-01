@@ -100,3 +100,16 @@ Run `node tests/coldstor.cjs` for the updated payload checks.
 ### Multiple hardware nodes
 
 The recorder subscribes to `nesl_coldems/#` and `nesl_dtmems/#`. It captures all node IDs under both families concurrently, storing the namespace plus node ID as the device identity. Two COLD-EMS nodes and one DTM-EMS node can share the broker; each node within a family needs a unique ID. Restart an already-running recorder after changing its subscriptions. The Desk MQTT inventory also receives both families; its bench-node selector and cold-room charts currently select COLD-EMS devices.
+
+### Recorded overnight Desk
+
+Open `http://127.0.0.1:18731/index.html?desk=overnight` while serving this folder. The **Overnight recording** menu switches between the capture and live Desk. Each COLD-EMS node has its own most-eventful ten-minute window and full overnight view. Playback uses the latest saved sample at the cursor, with visible recording gaps; it does not regenerate mock values. Select power, phase volts, leakage or imbalance for the electrical chart. The temperature chart shades recorded door-open intervals.
+
+Build or refresh the local snapshot (ignored by Git):
+
+```bash
+node log/export-replay.mjs 2026-11-01T08:30:00-08:00
+node tests/replay.mjs
+```
+
+The snapshot includes only source messages explicitly labelled `mock=true`, keeps original row IDs and receipt timestamps, and excludes mains deliveries over five minutes older than their source timestamp. Its default cutoff is the morning of 1 November 2026. Original SQLite rows remain unchanged.

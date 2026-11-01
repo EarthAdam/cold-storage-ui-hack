@@ -211,7 +211,8 @@ function fields(kind, body) {
     out.ma_a = num(sensors.A && sensors.A.leakage_ma);
     out.ma_b = num(sensors.B && sensors.B.leakage_ma);
     out.ma_c = num(sensors.C && sensors.C.leakage_ma);
-    out.alarm = [sensors.A, sensors.B, sensors.C].some(function (s) { return s && s.alarm; }) ? 1 : 0;
+    const reported = [sensors.A, sensors.B, sensors.C].filter(function (s) { return s && typeof s.alarm === "boolean"; });
+    out.alarm = reported.length ? (reported.some(function (s) { return s.alarm; }) ? 1 : 0) : null;
   }
   if (typeof msg.leakage_alarm_active === "boolean") out.alarm = msg.leakage_alarm_active ? 1 : 0;
   const upper = msg.sensors && msg.sensors.upper_storage_temp;

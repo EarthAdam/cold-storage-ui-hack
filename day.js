@@ -995,7 +995,7 @@
     replayState: function () { return replay ? { done: Date.now() - replay.started >= replay.duration } : null; }
   };
   requestAnimationFrame(function spin() {
-    moveHand();
+    if (!(window.HoldOvernight && HoldOvernight.active())) moveHand();
     requestAnimationFrame(spin);
   });
 })();

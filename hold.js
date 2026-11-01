@@ -1042,6 +1042,11 @@ function coordText(room) {
 }
 
 function renderStrip() {
+  if (window.HoldOvernight && HoldOvernight.active()) {
+    document.getElementById("strip").textContent = HoldOvernight.headline();
+    document.getElementById("blurb").textContent = "Desk · overnight recording. Saved MQTT rows; mock at source. No generated replay readings.";
+    return;
+  }
   if (packReplayActive()) {
     const replay = HoldDay.replayState();
     const room = state.rooms.find(function (r) { return r.id === "out"; });
@@ -1064,7 +1069,7 @@ function renderStrip() {
       bits.push("C " + Math.round(c.volts[2]) + " V");
       bits.push(Math.round((c.watts[0] || 0) + (c.watts[1] || 0) + (c.watts[2] || 0)) + " W");
     } else bits.push(c && c.link === "connected" ? "meter quiet" : "waiting for mains");
-    bits.push(c && c.leakageAlarm ? "leakage alarm" : "leakage quiet");
+    bits.push("leakage " + leakageStatus(c));
     bits.push((c && c.coldstor && c.coldstor.mock ? "SIM probes · " : "") + (storText(c) || climateText(c && c.climate) || "no room probe"));
     document.getElementById("strip").textContent = bits.join("  ·  ");
     document.getElementById("blurb").textContent = fill(profile().blurb, null);
@@ -1203,13 +1208,25 @@ function deskProbeDetails(node) {
     }).join('') + '</tbody></table></div></section>';
 }
 
+function leakageStatus(node) {
+  if (!node || !node.lastLeak) return "not reported";
+  if (node.lastLeak.valid === false) return "invalid data";
+  return (node.lastLeak.mock === true ? "SIM · " : "") + (node.leakageAlarm ? "alarm" : "no alarm reported");
+}
+
+function isolationText(node) {
+  const value = node && node.isolationFeedback;
+  if (value == null) return "not reported";
+  return typeof value === "object" ? JSON.stringify(value) : String(value);
+}
+
 function deskHealthDetails(node) {
   if (!node) return "";
   const status = node.status || {};
   const age = function (value) { return value == null ? "unknown" : (Math.max(0, Number(value)) / 1000).toFixed(1) + " s"; };
   return '<ul class="facts">' + fact("Rule engine (reported)", status.rule_engine_ok == null ? "unknown" : status.rule_engine_ok ? "OK" : "fault") +
     fact("Mains age (reported)", age(status.mains_data_age_ms)) + fact("Leakage age (reported)", age(status.leakage_data_age_ms)) +
-    fact("Last node action", node.lastAction || "unknown") + fact("Active alert codes", node.activeCodes || "unknown") +
+    fact("Isolation feedback (reported)", isolationText(node)) + fact("Last node action", node.lastAction || "unknown") + fact("Active alert codes", node.activeCodes || "unknown") +
     fact("Neutral risk (reported)", node.neutral && node.neutral.neutral_risk || "unknown") + '</ul>';
 }
 
@@ -1242,7 +1259,7 @@ function renderDeskDetail(room) {
       fact("Humidity", rh) +
       fact("Link", c && c.link ? c.link : "—") +
       fact("Alert", c && c.severity ? c.severity : "—") +
-      fact("Leakage", c && c.leakageAlarm ? "alarm" : "quiet") +
+      fact("Leakage", leakageStatus(c)) +
       fact("Mode", c && c.monitorOnly === false ? "control armed" : "monitor only") +
     '</ul>' +
     deskProbeDetails(c) + deskHealthDetails(c) +
@@ -1266,6 +1283,7 @@ function renderFeed() {
 function renderCall() {
   const el = document.getElementById("call");
   if (!el) return;
+  if (window.HoldOvernight && HoldOvernight.active()) { el.hidden = true; return; }
   const rank = { Nurse: 0, Staff: 1, Technician: 2 };
   const rooms = state.rooms.filter(function (room) { return room.callMessage; });
   rooms.sort(function (a, b) {
@@ -1302,9 +1320,11 @@ function renderPhase() {
   }
   const down = c.mainsValid ? c.volts.map(function (v) { return v < 40; }) : [false, false, false];
   const legs = ["A", "B", "C"].map(function (ph, i) {
-    const leak = (c.leak && c.leak[i]) || { alarm: false, ma: 0 };
+    const leak = (c.leak && c.leak[i]) || { alarm: null, ma: null };
     const cls = !c.mainsValid ? " quiet" : (down[i] ? " dead" : " live");
-    const leakTxt = leak.alarm ? "leakage alarm" : "leakage quiet";
+    const leakTxt = (c.lastLeak && c.lastLeak.mock === true ? "SIM · " : "") +
+      (leak.ma == null ? "leakage unavailable" : leak.ma.toFixed(2) + " mA · " +
+        (leak.alarm === true ? "alarm" : leak.alarm === false ? "no alarm reported" : "alarm state unknown"));
     return '<div class="ph-leg' + cls + '"><em>' + ph + '</em><strong>' +
       (c.mainsValid ? Math.round(c.volts[i]) + " V" : "—") + '</strong><span>' +
       (c.mainsValid ? Math.round(c.watts[i]) + " W · " : "") + leakTxt + '</span></div>';
@@ -1332,6 +1352,10 @@ function renderPhase() {
 }
 
 function renderChip() {
+  if (window.HoldOvernight && HoldOvernight.active()) {
+    document.getElementById("link-chip").textContent = "Recorded · SIM at source";
+    return;
+  }
   const chip = document.getElementById("link-chip");
   const liveRooms = state.rooms.filter(function (r) { return r.envLive || r.powerLive; });
   const board = liveRooms.some(function (r) { return !r.deviceId || r.deviceId.indexOf("sim-") !== 0; });
@@ -1434,6 +1458,10 @@ function renderPackDemo() {
 }
 
 function render() {
+  if (state.profileId === "desk" && window.HoldOvernight && HoldOvernight.active()) {
+    renderStrip(); renderChip(); renderCall();
+    return;
+  }
   if (state.coldems && state.coldems.lastColdStor) state.coldems.coldstor = readStor(state.coldems.lastColdStor, state.coldems.coldstorReceived);
   var detail = document.getElementById("detail");
   var world = state.profileId === "clinic" || state.profileId === "packhouse" || state.profileId === "desk";
@@ -1644,7 +1672,7 @@ function ensureCold(id) {
       hz: 0,
       mainsValid: false,
       leakageAlarm: false,
-      leak: [{ alarm: false, ma: 0 }, { alarm: false, ma: 0 }, { alarm: false, ma: 0 }],
+      leak: [{ alarm: null, ma: null }, { alarm: null, ma: null }, { alarm: null, ma: null }],
       severity: "",
       activeCodes: "",
       lastAction: "",
@@ -2001,7 +2029,7 @@ function ingestCold(parts, raw) {
   } else if (leaf === "leakage" && msg.sensors) {
     ["A", "B", "C"].forEach(function (ph, i) {
       const s = msg.sensors[ph] || {};
-      node.leak[i] = { alarm: !!s.alarm, ma: Number(s.leakage_ma) || 0 };
+      node.leak[i] = { alarm: typeof s.alarm === "boolean" ? s.alarm : null, ma: finiteNum(s.leakage_ma) };
     });
     node.sensorLeakageAlarm = node.leak.some(function (s) { return s.alarm; });
     node.leakageAlarm = node.sensorLeakageAlarm || node.alertLeakageAlarm;
@@ -2036,6 +2064,7 @@ function ingestCold(parts, raw) {
     const room = coldTarget();
     if (room) applyEnv(room, probe);
   }
+  if (Object.prototype.hasOwnProperty.call(msg, "isolation_feedback")) node.isolationFeedback = msg.isolation_feedback;
   const boardC = msg.dtm_temp != null ? msg.dtm_temp : (msg.cold_ems_temp != null ? msg.cold_ems_temp : (msg.coldems_temp != null ? msg.coldems_temp : msg["COLD-EMS_temp"]));
   if (boardC != null && boardC !== "") node.boardC = Number(boardC);
   paintCallFromCold(node);

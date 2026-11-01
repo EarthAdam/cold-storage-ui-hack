@@ -1058,6 +1058,7 @@ function cabById(id) {
 function frame(now) {
   if (!mounted) return;
   raf = requestAnimationFrame(frame);
+  if (window.HoldOvernight && HoldOvernight.active()) return;
   cabs.forEach(function (cab) {
     if (cab.hinge) {
       var goal = cab.open ? -1.15 : 0;
