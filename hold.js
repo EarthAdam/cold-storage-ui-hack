@@ -13,7 +13,7 @@
 const PLACES = {
   vaccine: [34.7682, 0.5144], oxy: [34.7688, 0.5148], insulin: [34.7676, 0.5140],
   ice: [39.84915, -3.63400], day: [39.84975, -3.63405], blast: [39.84855, -3.63408],
-  leaf: [36.4355, -0.7354], tomato: [36.4364, -0.7346], out: [36.4346, -0.7362]
+  leaf: [7.491, 9.058], tomato: [7.492, 9.059], out: [7.490, 9.057]
 };
 
 const STORE = "hold.geh.v1";
@@ -111,7 +111,7 @@ const PROFILES = {
   packhouse: {
     label: "Packhouse",
     blurb: "Phase B drops. DTM-EMS grants the move. COLD-EMS puts the market cooler on phase A. Contactors are simulated.",
-    currency: "KES",
+    currency: "NGN",
     lines: {
       ok: "In band. Leave the door shut between pallets.",
       freeze: "Too cold for this crop. Chill injury starts here.",
@@ -129,21 +129,21 @@ const PROFILES = {
     },
     rooms: [
       roomSpec({
-        id: "leaf", name: "Leafy room", place: "Packhouse",
+        id: "leaf", name: "Leafy room", place: "Nigeria packhouse · illustrative location",
         stock: "leafy greens", qty: 80, unit: "crates", unitValue: 900,
         band: [0, 2], freeze: 0, freezeRuins: false, rhBand: [90, 98], scale: [-2, 12],
         rh: 61, temp: 1.1, watts: 310, runW: 400, volts: 230,
         script: "dry", dryMin: 50, spoilMin: 120, autonomyMin: 150
       }),
       roomSpec({
-        id: "tomato", name: "Tomato room", place: "Packhouse",
+        id: "tomato", name: "Tomato room", place: "Nigeria packhouse · illustrative location",
         stock: "tomatoes", qty: 140, unit: "crates", unitValue: 700,
         band: [10, 13], freeze: null, rhBand: [80, 95], scale: [0, 20],
         rh: 86, temp: 11.6, watts: 260, runW: 380, volts: 231,
         script: "hold", autonomyMin: 180, spoilMin: 180
       }),
       roomSpec({
-        id: "out", name: "Market cooler", place: "Packhouse",
+        id: "out", name: "Market cooler", place: "Nigeria packhouse · illustrative location",
         stock: "market load", qty: 40, unit: "crates", unitValue: 1100,
         band: [4, 8], freeze: null, scale: [0, 18],
         rh: 78, temp: 6.4, watts: 120, runW: 350, volts: 230,
@@ -354,6 +354,7 @@ function riskFraction(room, sit) {
 }
 
 function money(amount) {
+  if (state.profileId === "packhouse") return "Not valued";
   try {
     return new Intl.NumberFormat("en", {
       style: "currency",
@@ -853,6 +854,11 @@ function renderTimelines() {
   const host = document.getElementById("timelines");
   const head = document.getElementById("tl-head");
   if (!host) return;
+  if (state.profileId === "desk") {
+    host.innerHTML = "";
+    if (head) head.textContent = "Live mains, leakage and probe history are on the clock. Expand MQTT feed for every field.";
+    return;
+  }
   const room = selectedRoom();
   const samples = room.spark;
   const last = samples[samples.length - 1] || {};
@@ -1225,7 +1231,7 @@ function renderPhase() {
   const on = state.profileId === "desk";
   el.hidden = !on;
   if (!on) return;
-  const c = state.coldems;
+  const c = liveFeed();
   if (!c || !c.deviceId) {
     el.innerHTML = '<div class="ph-top"><b>COLD-EMS</b><span>LIVE</span></div>' +
       '<p class="ph-step">Waiting for nesl_coldems.</p>';
@@ -1241,7 +1247,8 @@ function renderPhase() {
       (c.mainsValid ? Math.round(c.watts[i]) + " W · " : "") + leakTxt + '</span></div>';
   }).join("");
   let step = "Node linked. Meter is quiet, so the phases stay unmarked.";
-  if (c.link === "lost") step = "Link lost. Last values stay on screen. Nothing is switched.";
+  if (!coldFresh(state.coldems) && c.mainsSeen) step = "Mains readings are stale. Check the node. Nothing is switched.";
+  else if (c.link === "lost") step = "Link lost. Last values stay on screen. Nothing is switched.";
   else if (c.leakageAlarm) step = "Leakage fault. Transfer blocked. Call a technician.";
   else if (c.mainsValid && down.some(Boolean) && down.filter(Boolean).length < 3) {
     const who = ["A", "B", "C"].filter(function (ph, i) { return down[i]; }).join(" and ");
@@ -1257,7 +1264,8 @@ function renderPhase() {
     '<div class="ph-legs">' + legs + '</div>' +
     '<p class="ph-load">' + esc(c.link || "no state") + " · " + esc(act + last) +
       (c.severity ? " · alert " + esc(c.severity) : "") +
-      (c.hz ? " · " + c.hz.toFixed(1) + " Hz" : "") + '</p>';
+      (c.hz ? " · " + c.hz.toFixed(1) + " Hz" : "") +
+      (c.neutral ? " · neutral " + esc(c.neutral.neutral_current_a == null ? "unknown" : c.neutral.neutral_current_a + " A") + " · " + esc(c.neutral.neutral_risk || "unassessed") : "") + '</p>';
 }
 
 function renderChip() {
@@ -1340,6 +1348,7 @@ function render() {
   renderCall();
   paintScene();
   renderPhase();
+  if (window.HoldTelemetry) HoldTelemetry.paint();
   if (window.HoldDay) HoldDay.paint(state.profileId);
 }
 
@@ -1481,10 +1490,28 @@ function packRoom() {
   return state.rooms.filter(function (r) { return r.id === "out"; })[0] || null;
 }
 
+function coldFresh(node) {
+  return !!(node && node.link !== "lost" && node.mainsSeen && Date.now() - node.mainsSeen < 60000);
+}
+
 function liveFeed() {
-  return state.coldems;
+  const node = state.coldems;
+  if (!node) return null;
+  return Object.assign({}, node, { mainsValid: node.mainsValid && coldFresh(node) });
 }
 window.HoldLive = liveFeed;
+window.HoldSelectCold = function (id) {
+  if (!coldNodes.has(id)) return;
+  state.coldems = coldNodes.get(id);
+  state.deskMains.length = 0; state.deskLeak.length = 0; state.deskRoom.length = 0;
+  state.deskRev += 1;
+  if (state.coldems.lastMains) rememberMains(epochMs(state.coldems.lastMains), state.coldems.lastMains);
+  if (state.coldems.lastLeak) rememberLeak(epochMs(state.coldems.lastLeak), state.coldems.lastLeak);
+  loadDeskLog();
+  applyColdRoom(state.coldems);
+  paintCallFromCold(state.coldems);
+  render();
+};
 window.HoldDesk = function () { return state.profileId === "desk"; };
 
 function coldTarget() {
@@ -1492,10 +1519,12 @@ function coldTarget() {
   return state.rooms.filter(function (r) { return r.id === id; })[0] || null;
 }
 
+const coldNodes = new Map();
+
 function ensureCold(id) {
-  if (!state.coldems || state.coldems.deviceId !== id) {
+  if (!coldNodes.has(id)) {
     if (!state.coldems) note("COLD-EMS " + id + " is on the broker.");
-    state.coldems = {
+    coldNodes.set(id, {
       deviceId: id,
       link: "",
       volts: [0, 0, 0],
@@ -1510,15 +1539,17 @@ function ensureCold(id) {
       monitorOnly: true,
       mdns: "",
       seen: 0
-    };
+    });
   }
-  state.coldems.seen = Date.now();
-  return state.coldems;
+  const node = coldNodes.get(id);
+  if (!state.coldems) state.coldems = node;
+  node.seen = Date.now();
+  return node;
 }
 
 function applyColdRoom(node) {
   const room = coldTarget();
-  if (!room || !node.mainsValid) return;
+  if (!room || node !== state.coldems || !node.mainsValid) return;
   room.deviceId = node.deviceId;
   room.phases = node.watts.slice();
   room.watts = node.watts[0] + node.watts[1] + node.watts[2];
@@ -1531,10 +1562,22 @@ function applyColdRoom(node) {
 
 function paintCallFromCold(node) {
   const room = coldTarget();
-  if (!room) return;
+  if (!room || node !== state.coldems) return;
+  if (node.link === "lost" || (node.mainsSeen && !coldFresh(node))) {
+    room.callWho = "COLD-EMS";
+    room.callMessage = "Telemetry lost or stale. Check the node before relying on the last readings.";
+    room.callLive = true;
+    return;
+  }
   if (node.leakageAlarm) {
     room.callWho = "COLD-EMS";
     room.callMessage = "Leakage fault. Transfer blocked. Call a technician.";
+    room.callLive = true;
+    return;
+  }
+  if (node.neutral && (node.neutral.phase_rotation_fault || node.neutral.voltage_imbalance_fault || node.neutral.current_imbalance_fault || node.neutral.balancing_inhibited)) {
+    room.callWho = "Technician";
+    room.callMessage = "Phase or neutral diagnostic needs attention. Check the feeder before a transfer.";
     room.callLive = true;
     return;
   }
@@ -1600,6 +1643,7 @@ function epochMs(msg, fallback) {
 }
 
 function finiteNum(v) {
+  if (v == null || v === "" || typeof v === "boolean") return null;
   const n = Number(v);
   return Number.isFinite(n) ? n : null;
 }
@@ -1667,12 +1711,14 @@ function rememberLeak(ts, msg) {
 }
 
 function loadDeskLog() {
+  const device = state.coldems && state.coldems.deviceId;
+  if (!device) return;
   function pull(kind, take) {
-    fetch("http://127.0.0.1:8732/q?kind=" + kind + "&limit=1000")
+    fetch("http://127.0.0.1:8732/q?kind=" + kind + "&device=" + encodeURIComponent("nesl_coldems/" + device) + "&limit=1000")
       .then(function (r) { return r.json(); })
       .then(function (data) {
         (data.rows || []).forEach(function (row) {
-          if (String(row.topic || "").indexOf("nesl_coldems/") !== 0) return;
+          if (!state.coldems || state.coldems.deviceId !== device || String(row.topic || "").indexOf("nesl_coldems/" + device + "/") !== 0) return;
           let msg;
           try { msg = JSON.parse(row.body); }
           catch (e) { return; }
@@ -1708,6 +1754,7 @@ function ingestCold(parts, raw) {
   try { msg = JSON.parse(raw); }
   catch (e) { return; }
   const leaf = sub.split("/").pop().toLowerCase().replace(/-/g, "");
+  if (!msg || typeof msg !== "object") return;
   if (leaf === "mains" && msg.phases) {
     ["A", "B", "C"].forEach(function (ph, i) {
       const p = msg.phases[ph] || {};
@@ -1715,8 +1762,10 @@ function ingestCold(parts, raw) {
       node.watts[i] = Number(p.real_power_w) || 0;
     });
     node.hz = Number(msg.totals && msg.totals.frequency_avg) || 0;
-    node.mainsValid = node.volts.some(function (v) { return v > 40; });
-    rememberMains(epochMs(msg), msg);
+    node.mainsSeen = Math.min(Date.now(), epochMs(msg)) - Math.max(0, Number(msg.age_ms) || 0);
+    node.mainsValid = msg.valid !== false && msg.mock !== true && msg.simulated !== true && msg.data_mode !== "simulated" && node.volts.some(function (v) { return v > 40; });
+    node.lastMains = msg;
+    if (node === state.coldems) rememberMains(epochMs(msg), msg);
     applyColdRoom(node);
   } else if (leaf === "epem") {
     node.mdns = msg.mdns_name || node.mdns;
@@ -1725,13 +1774,19 @@ function ingestCold(parts, raw) {
       const s = msg.sensors[ph] || {};
       node.leak[i] = { alarm: !!s.alarm, ma: Number(s.leakage_ma) || 0 };
     });
-    node.leakageAlarm = node.leak.some(function (s) { return s.alarm; });
-    rememberLeak(epochMs(msg), msg);
+    node.sensorLeakageAlarm = node.leak.some(function (s) { return s.alarm; });
+    node.leakageAlarm = node.sensorLeakageAlarm || node.alertLeakageAlarm;
+    node.lastLeak = msg;
+    if (node === state.coldems) rememberLeak(epochMs(msg), msg);
   } else if (leaf === "alerts") {
     node.severity = msg.severity || "";
     node.activeCodes = msg.active_codes || "";
-    if (msg.leakage_alarm_active) node.leakageAlarm = true;
-    else if (msg.severity === "normal") node.leakageAlarm = false;
+    if (typeof msg.leakage_alarm_active === "boolean") node.alertLeakageAlarm = msg.leakage_alarm_active;
+    node.leakageAlarm = !!(node.sensorLeakageAlarm || node.alertLeakageAlarm);
+  } else if (leaf === "neutral") {
+    node.neutral = msg;
+  } else if (leaf === "status") {
+    node.status = msg;
   } else if (leaf === "automation") {
     node.lastAction = msg.last_action || "";
     node.monitorOnly = msg.monitor_only !== false;
@@ -1741,7 +1796,7 @@ function ingestCold(parts, raw) {
     : (Array.isArray(msg.probes) ? msg.probes.filter(function (p) {
         return p && (p.temperature_C != null || p.humidity_percent != null);
       })[0] : null);
-  if (probe) {
+  if (probe && node === state.coldems) {
     rememberRoom(epochMs(msg), probe);
     const room = coldTarget();
     if (room) applyEnv(room, probe);
@@ -1751,7 +1806,8 @@ function ingestCold(parts, raw) {
   paintCallFromCold(node);
 }
 
-function ingest(topic, raw) {
+function ingest(topic, raw, packet) {
+  if (window.HoldTelemetry) HoldTelemetry.capture(topic, raw, packet);
   state.lastRaw = topic + "\n" + String(raw).slice(0, 4000);
   const parts = topic.split("/").filter(Boolean);
   if (parts[0] === "nesl_coldems") {
@@ -1767,6 +1823,7 @@ function ingest(topic, raw) {
     render();
     return;
   }
+  if (parts[0] !== "openami" || !msg || typeof msg !== "object") return;
   const at = parts.indexOf("openami");
   const base = at >= 0 ? at : 0;
   if (parts.length < base + 3) return;
@@ -1847,15 +1904,22 @@ function connectMqtt() {
     state.mqtt = "on";
     state.mqttAuto = true;
     const topics = [prefix.replace(/\/$/, "") + "/#"];
-    if (topics.indexOf("nesl_coldems/#") < 0) topics.push("nesl_coldems/#");
-    topics.forEach(function (topic) { client.subscribe(topic); });
-    document.getElementById("link-status").textContent = "Connected. Subscribed to " + topics.join(" and ");
+    ["nesl_coldems/#", "nesl_dtmems/#", "nesl_dtnami/#", "wmac_EVPEAMI/#", "coldami/v1/#"].forEach(function (topic) {
+      if (topics.indexOf(topic) < 0) topics.push(topic);
+    });
+    document.getElementById("link-status").textContent = "Broker connected. Checking subscriptions…";
+    client.subscribe(topics, { qos: 1 }, function (err, granted) {
+      const refused = err || !granted || granted.some(function (g) { return g.qos === 128; });
+      document.getElementById("link-status").textContent = refused
+        ? "Broker connected, but a subscription failed. Check broker permissions."
+        : "Subscribed to " + topics.join(", ");
+    });
     note("Broker connected.");
     saveStore();
     render();
   });
-  client.on("message", function (topic, buf) {
-    ingest(topic, buf.toString());
+  client.on("message", function (topic, buf, packet) {
+    ingest(topic, buf.toString(), packet);
   });
   client.on("error", function (err) {
     document.getElementById("link-status").textContent = err && err.message ? err.message : "MQTT error";
@@ -2014,6 +2078,7 @@ function boot() {
   });
 
   setInterval(function () {
+    if (state.coldems) paintCallFromCold(state.coldems);
     const h = window.HoldDay ? window.HoldDay.hour() : 0;
     if (state.profileId === "desk") {
       state.rooms.forEach(function (room) { tickRoom(room, h, h, 1 / 60); });

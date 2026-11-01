@@ -4,7 +4,7 @@
   var PLACE = {
     clinic: "Butali Chegulo, Malava, Kakamega",
     landing: "Kilifi",
-    packhouse: "Hells Gate, Naivasha"
+    packhouse: "Nigeria packhouse · illustrative Abuja setting"
   };
   var CLOSE = { clinic: 17, landing: 17, packhouse: 16.4 };
   var BEARING = { clinic: -28, landing: 170, packhouse: -18 };

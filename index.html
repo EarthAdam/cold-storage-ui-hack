@@ -4,7 +4,7 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Hold · cold storage desk</title>
-<link rel="stylesheet" href="hold.css?v=36">
+<link rel="stylesheet" href="hold.css?v=37">
 <script type="importmap">
 {
   "imports": {
@@ -78,6 +78,7 @@
     <div id="detail-body"></div>
     <p class="tl-head" id="tl-head"></p>
     <div id="timelines" class="timelines"></div>
+    <section id="mqtt-telemetry" aria-label="Received MQTT data"></section>
     <details id="tech">
       <summary>Phases and last payload</summary>
       <p class="phases" id="phases"></p>
@@ -95,7 +96,7 @@
 <dialog class="link" id="link">
   <form method="dialog" id="link-form">
     <h2>MQTT link</h2>
-    <p class="hint">The desk listens on <code>wss://public.cloud.shiftr.io</code> for <code>openami/#</code> and <code>nesl_coldems/#</code>. COLD-EMS mains are <code>nesl_coldems/&lt;id&gt;/COLDAMI/mains</code>. The page does not publish.</p>
+    <p class="hint">The desk listens on <code>wss://public.cloud.shiftr.io</code> for <code>openami/#</code> <code>nesl_coldems/#</code>, and the proposed <code>coldami/v1/#</code> display contract. COLD-EMS mains are <code>nesl_coldems/&lt;id&gt;/COLDAMI/mains</code>. The page does not publish.</p>
     <label>WebSocket URL
       <input name="url" id="broker-url" value="wss://public.cloud.shiftr.io">
     </label>
@@ -124,10 +125,11 @@
 <script src="https://unpkg.com/mqtt@5.10.4/dist/mqtt.min.js"></script>
 <script src="https://unpkg.com/maplibre-gl@5.6.1/dist/maplibre-gl.js"></script>
 <script src="chain.js?v=11"></script>
-<script src="day.js?v=19"></script>
-<script src="scene.js?v=17"></script>
+<script src="day.js?v=20"></script>
+<script src="scene.js?v=18"></script>
 <script src="plan.js?v=12"></script>
-<script src="hold.js?v=30"></script>
+<script src="telemetry.js?v=1"></script>
+<script src="hold.js?v=32"></script>
 <script type="module" src="doll.js?v=14"></script>
 </body>
 </html>

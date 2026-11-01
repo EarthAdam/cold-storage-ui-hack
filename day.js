@@ -41,9 +41,10 @@
       ]
     },
     packhouse: {
-      name: "Hells Gate",
-      lat: -0.735,
-      lng: 36.436,
+      name: "Nigeria packhouse (illustrative)",
+      utcOffset: 1,
+      lat: 9.058,
+      lng: 7.491,
       line: "Harvest in the cool. The hard hours are midday: field heat, a full room, and the strongest sun at the same time.",
       rings: [
         { id: "pv", name: "PV", color: "#e6c56a", sun: "day", label: "Sun covers the cooling load" },
@@ -199,7 +200,7 @@
   }
 
   /* SunCalc-style solar times. Returns fractional hours in East Africa Time. */
-  function sun(lat, lng, y, m, d) {
+  function sun(lat, lng, y, m, d, utcOffset) {
     var PI = Math.PI;
     var rad = PI / 180;
     var dayMs = 86400000;
@@ -226,7 +227,7 @@
       return [fromJ(Jrise), fromJ(Jset)];
     }
     function eat(ms) {
-      var t = new Date(ms + TZ * 3600000);
+      var t = new Date(ms + (utcOffset == null ? TZ : utcOffset) * 3600000);
       return t.getUTCHours() + t.getUTCMinutes() / 60 + t.getUTCSeconds() / 3600;
     }
     var day = edge(-0.833);
@@ -282,7 +283,7 @@
     if (!host) return;
     var profile = PROFILES[id] || PROFILES.clinic;
     var parts = dateParts();
-    var light = sun(profile.lat, profile.lng, parts.y, parts.m, parts.d);
+    var light = sun(profile.lat, profile.lng, parts.y, parts.m, parts.d, profile.utcOffset);
     var rings = ringsFor(profile, light);
     if (id === "clinic" && window.CLINIC_DOORS) {
       rings.push(

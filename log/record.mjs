@@ -127,12 +127,15 @@ export function classify(topic) {
     if (sub === "cmd" || sub.endsWith("/cmd")) return { device: device, kind: "cmd" };
     return { device: device, kind: parts[parts.length - 1] };
   }
+  if (parts[0] === "coldami" && parts[1] === "v1" && parts.length >= 6) {
+    return { device: parts.slice(0, 5).join("/"), kind: parts.slice(5).join("/") };
+  }
   const device = parts.length > 1 ? parts[0] + "/" + parts[1] : parts[0];
   return { device: device, kind: parts.length > 2 ? parts[parts.length - 1] : "other" };
 }
 
 function num(v) {
-  return typeof v === "number" && !Number.isNaN(v) ? v : null;
+  return typeof v === "number" && Number.isFinite(v) ? v : null;
 }
 
 function blankFields() {
@@ -303,8 +306,8 @@ export function ask(db, q) {
 }
 
 function latest(db, device) {
-  const env = db.prepare("SELECT id, ts, topic, temperature_C, humidity_percent, door_open, body FROM msg WHERE device = ? AND kind = 'env' ORDER BY id DESC LIMIT 1").get(device);
-  const power = db.prepare("SELECT id, ts, topic, watts, volts, body FROM msg WHERE device = ? AND kind = 'power' ORDER BY id DESC LIMIT 1").get(device);
+  const env = db.prepare("SELECT id, ts, topic, temperature_C, humidity_percent, door_open, body FROM msg WHERE device = ? AND kind IN ('env', 'environment') ORDER BY id DESC LIMIT 1").get(device);
+  const power = db.prepare("SELECT id, ts, topic, watts, volts, body FROM msg WHERE device = ? AND kind IN ('power', 'mains', 'electrical') ORDER BY id DESC LIMIT 1").get(device);
   const n = db.prepare("SELECT COUNT(*) AS n, MAX(ts) AS ts FROM msg WHERE device = ?").get(device);
   return { device: device, n: n ? n.n : 0, ts: n ? n.ts : null, env: env || null, power: power || null };
 }
@@ -620,7 +623,11 @@ function loadStreams() {
   const file = path.join(here, "streams.json");
   if (fs.existsSync(file)) {
     const list = JSON.parse(fs.readFileSync(file, "utf8"));
-    if (Array.isArray(list) && list.length) return list;
+    if (Array.isArray(list) && list.length) return list.map(function (stream) {
+      return stream.host === "public.cloud.shiftr.io"
+        ? { ...stream, topics: Array.from(new Set([...(stream.topics || []), "openami/#", "nesl_coldems/#", "coldami/v1/#"])) }
+        : stream;
+    });
   }
   const prefix = (flag("--prefix") || "openami").replace(/\/$/, "");
   return [{
@@ -628,7 +635,7 @@ function loadStreams() {
     port: Number(flag("--port") || 1883),
     user: flag("--user") || "public",
     pass: flag("--pass") || "public",
-    topics: [prefix + "/#"]
+    topics: Array.from(new Set([prefix + "/#", "nesl_coldems/#", "coldami/v1/#"]))
   }];
 }
 

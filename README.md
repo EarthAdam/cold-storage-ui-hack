@@ -67,3 +67,22 @@ AGPL-3.0. Copyright (C) 2026 Overview Solutions. See `LICENSE`.
 You may sell a copy. If you change this desk and serve that change on a network, offer the source. Public source: [github.com/EarthAdam/cold-storage-ui-hack](https://github.com/EarthAdam/cold-storage-ui-hack).
 
 Other libraries: `THIRD_PARTY_NOTICES.md`. Prior work vs this weekend: `DISCLOSURE.md`.
+
+## Feed coverage and demo readiness
+
+Expand **MQTT feed** on Packhouse or Desk to see every received topic, every nested field (including all probes), receipt counts, source labels, freshness, and original payloads. The bench-node selector keeps devices separate. This inventory contains the latest payload per topic for the browser session; `log/record.mjs` keeps full message history independently.
+
+The browser listens to `openami/#`, `nesl_coldems/#`, `nesl_dtmems/#`, `nesl_dtnami/#`, `wmac_EVPEAMI/#`, and `coldami/v1/#` on the selected broker. The last namespace is a proposed display contract: these payloads are inspectable and recorded, but are not yet mapped into room cards. A broker subscription is checked for acceptance; additional brokers require separate configured listeners.
+
+Without `log/streams.json`, the recorder now subscribes to both `openami/#` and `nesl_coldems/#`, plus `coldami/v1/#`. An existing streams file retains its additional configured feeds. Board facts now recognize COLD-EMS mains. Unknown fields remain intact in each stored body.
+
+The Nigerian packhouse map location is illustrative, not a verified pilot site. Packhouse stock values read **Not valued** until local valuations are configured. The transfer animation remains simulated. Mains, leakage and probe history are shown on the Desk clock; fabricated door, frequency and stock charts are omitted there.
+
+Before presenting a **live transfer**, verify nonzero mains, a real cold-room probe, controller grant and contactor feedback, cooling recovery, and the leakage-block sequence. Receipt of `last_action` alone is not proof of successful transfer. The UI never commands hardware. An offline hardware demo also needs a reachable local broker and locally served dependencies; the default public broker and CDN assets require internet.
+
+Checks:
+
+```bash
+node tests/mqtt.cjs
+node log/record.mjs --check
+```

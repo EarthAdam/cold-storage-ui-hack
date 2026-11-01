@@ -1,0 +1,34 @@
+const vm = require('node:vm');
+const fs = require('node:fs');
+const assert = require('node:assert/strict');
+const path = require("node:path").resolve(__dirname, "..");
+const ctx = vm.createContext({window:{},console, Date, Map, Set, Intl, setInterval(){}});
+vm.runInContext(fs.readFileSync(path+'/telemetry.js','utf8'),ctx);
+vm.runInContext(fs.readFileSync(path+'/hold.js','utf8').replace(/boot\(\);\s*$/,''),ctx);
+vm.runInContext(`
+state.profileId = 'packhouse'; state.rooms = buildRooms('packhouse');
+function send(id,leaf,msg) { ingestCold(['nesl_coldems', id, 'COLDAMI', leaf],JSON.stringify(msg)); }
+send('one','mains',{valid:true,phases:{A:{voltage_ln:230},B:{voltage_ln:12},C:{voltage_ln:229}}});
+if (!state.coldems.mainsValid) throw Error('phase drop missed');
+send('one','leakage',{sensors:{A:{alarm:true,leakage_ma:35}}});
+send('one','alerts',{severity:'normal',leakage_alarm_active:false});
+if (!state.coldems.leakageAlarm) throw Error('normal alert cleared measured leakage');
+send('two','mains',{phases:{A:{voltage_ln:200}}});
+if (state.coldems.deviceId !== 'one' || state.coldems.volts[0] !== 230) throw Error('devices mixed');
+send('one','leakage',{sensors:{A:{alarm:false}}});
+if (state.coldems.leakageAlarm) throw Error('alarm did not clear');
+send('one','mains',{valid:false,phases:{A:{voltage_ln:230}}});
+if (state.coldems.mainsValid) throw Error('invalid accepted');
+send('one','mains',{valid:true,phases:{A:{voltage_ln:230}}});
+state.coldems.mainsSeen = Date.now()-61000;
+if (liveFeed().mainsValid) throw Error('stale mains shown valid');
+if (finiteNum(null)!==null || finiteNum('')!==null || finiteNum(0)!==0) throw Error('null became zero');
+const t=window.HoldTelemetry;
+t.capture('probe','{"probes":[{"temperature_C":4},{"temperature_C":7}],"mock":true}');
+if (t.fields(t.topics.get('probe').data,'',[]).length!==3) throw Error('probe fields dropped');
+if (!t.status(t.topics.get('probe'), Date.now()).includes('SIM')) throw Error('sim not labelled');
+t.capture('old',JSON.stringify({ts:Date.now()-70000,ttl_s:60}),{retain:true});
+if (!t.status(t.topics.get('old'),Date.now()).includes('STALE')) throw Error('retained stale missed');
+send('one','status',null);
+console.log('MQTT regression checks passed');
+`,ctx);
